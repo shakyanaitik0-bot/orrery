@@ -50,3 +50,59 @@ export async function askTutor(
     onChunk(decoder.decode(value, { stream: true }));
   }
 }
+
+
+export interface Account {
+  userId: string;
+  tenantId: string;
+  displayName: string;
+}
+
+export async function startAccount(
+  displayName: string,
+  educationLevel: string = "high_school"
+): Promise<Account> {
+  const res = await fetch("/api/auth/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ display_name: displayName, education_level: educationLevel }),
+  });
+  if (!res.ok) throw new Error(`Could not create an account (${res.status})`);
+  return res.json();
+}
+
+export async function restoreAccount(userId: string): Promise<Account | null> {
+  const res = await fetch(`/api/auth/me/${userId}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return { userId: data.userId, tenantId: data.tenantId, displayName: data.displayName };
+}
+
+export interface IngestResult {
+  subject: { slug: string; title: string };
+  conceptCount: number;
+  edgeCount: number;
+  provider: string;
+}
+
+/** Turns pasted notes into a new subject and its concept graph. */
+export async function ingestNotes(text: string, title?: string): Promise<IngestResult> {
+  const res = await fetch("/api/ingest/notes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, title }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Could not build a subject from that (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function listSubjects(): Promise<
+  { id: string; slug: string; title: string; description: string | null; accent: string }[]
+> {
+  const res = await fetch("/api/graph/subjects", { cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
+}

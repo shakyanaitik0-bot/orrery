@@ -28,6 +28,11 @@ learner's real mastery drives what you see:
   that concept the learner has already mastered.
 - **Recording an answer** runs Bayesian Knowledge Tracing in Rust, writes the
   new probability, and re-evaluates what is unlocked.
+- **Signing in** creates a real account (name + level, no password) and a
+  personal tenant — no more hardcoded demo user.
+- **Pasting notes** ("+ New subject") builds a new concept graph from raw
+  text through the same LLM interface the tutor uses, and drops you straight
+  into the resulting map.
 
 ## Quick start
 
@@ -101,10 +106,17 @@ prompts, the education ladder — the code is written fresh. See
 
 Named plainly so nothing here looks more finished than it is:
 
-- **Auth.** `User.external_id` is the seam for Clerk; there is no sign-in flow.
-- **Ingestion.** No PDF, notes or YouTube pipeline yet.
+- **Real identity.** `POST /api/auth/start` is a working stand-in for Clerk —
+  a name creates a real account with no password, because none are collected.
+  `User.external_id` is still the seam for swapping in Clerk later; see
+  `apps/api/routers/auth.py`.
+- **PDF and YouTube ingestion.** `POST /api/ingest/notes` takes pasted text
+  straight through to a concept graph. Getting a PDF or a transcript down to
+  text is a separate, mechanical step the pipeline doesn't need to know
+  about — it's just not wired up yet.
 - **Flashcard review UI.** SM-2 runs and is wired, but nothing drives it.
 - **Migrations.** Tables are created from the models; Alembic is not set up.
-- **Curriculum.** One seeded subject. TinkerSchool's 81 migrations and Open
-  Alpha's subject JSON are not imported.
-- **Multi-subject map.** The API serves any subject; the client requests one.
+- **Curriculum.** One seeded subject plus whatever you ingest. TinkerSchool's
+  81 migrations and Open Alpha's subject JSON are not imported.
+- **Row-level tenant scoping.** Every model carries `tenant_id`/`user_id`,
+  but nothing yet stops one tenant's API calls from reading another's data.

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import Base, engine
-from routers import graph, tutor
+from routers import auth, graph, ingest, tutor
 from services.llm.registry import get_client
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -26,7 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(graph.router)
+app.include_router(ingest.router)
 app.include_router(tutor.router)
 
 

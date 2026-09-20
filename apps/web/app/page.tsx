@@ -3,8 +3,11 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import AuthGate from "@/components/AuthGate";
+import IngestPanel from "@/components/IngestPanel";
 import TutorPanel from "@/components/TutorPanel";
-import { fetchProvider, fetchScene } from "@/lib/api";
+import { fetchProvider, fetchScene, listSubjects, restoreAccount } from "@/lib/api";
+import type { Account } from "@/lib/api";
 import type { Scene, SceneNode } from "@/lib/types";
 
 // The canvas touches `window` on import, so it must not render on the server.
@@ -13,20 +16,56 @@ const KnowledgeMap = dynamic(() => import("@/components/KnowledgeMap"), {
   loading: () => <div className="boot">Loading the map…</div>,
 });
 
-// Seeded demo learner. Real deployments read this from the auth session.
-const USER_ID =
-  process.env.NEXT_PUBLIC_DEMO_USER_ID ?? "178788d9-bf30-4c2e-8880-fc5a3e9a2179";
+const DEMO_SUBJECT = "algebra";
 
 export default function Page() {
+  // `undefined` = still checking localStorage; `null` = no account yet.
+  const [account, setAccount] = useState<Account | null | undefined>(undefined);
+  const [subjects, setSubjects] = useState<{ slug: string; title: string }[]>([]);
+  const [subjectSlug, setSubjectSlug] = useState(DEMO_SUBJECT);
   const [scene, setScene] = useState<Scene | null>(null);
   const [selected, setSelected] = useState<SceneNode | null>(null);
   const [provider, setProvider] = useState<string>("…");
   const [error, setError] = useState<string | null>(null);
+  const [showIngest, setShowIngest] = useState(false);
+
+  // Restore a stored account on load, falling back to the auth gate.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let storedId: string | null = null;
+      try {
+        storedId = localStorage.getItem("orrery.userId");
+      } catch {
+        /* private window or blocked storage */
+      }
+      if (storedId) {
+        const restored = await restoreAccount(storedId);
+        if (!cancelled) setAccount(restored);
+      } else if (!cancelled) {
+        setAccount(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadScene = useCallback((slug: string, userId: string) => {
+    fetchScene(slug, userId)
+      .then((s) => {
+        setScene(s);
+        setError(null);
+      })
+      .catch((e) => setError(e.message));
+  }, []);
 
   useEffect(() => {
-    fetchScene("algebra", USER_ID).then(setScene).catch((e) => setError(e.message));
+    if (!account) return;
+    loadScene(subjectSlug, account.userId);
     fetchProvider().then((p) => setProvider(p.provider));
-  }, []);
+    listSubjects().then(setSubjects);
+  }, [account, subjectSlug, loadScene]);
 
   const nodesById = useMemo(
     () => new Map((scene?.nodes ?? []).map((n) => [n.id, n])),
@@ -37,6 +76,7 @@ export default function Page() {
   // the server owns the gating rule, not the client.
   const handleMasteryChange = useCallback(
     async (conceptId: string, mastery: number) => {
+      if (!account) return;
       setScene((prev) =>
         prev
           ? {
@@ -48,15 +88,31 @@ export default function Page() {
           : prev
       );
       try {
-        const fresh = await fetchScene("algebra", USER_ID);
+        const fresh = await fetchScene(subjectSlug, account.userId);
         setScene(fresh);
         setSelected((s) => (s ? fresh.nodes.find((n) => n.id === s.id) ?? null : null));
       } catch {
         /* the optimistic update above still stands */
       }
     },
+    [account, subjectSlug]
+  );
+
+  const handleIngested = useCallback(
+    (slug: string) => {
+      setShowIngest(false);
+      setSelected(null);
+      setSubjectSlug(slug);
+      listSubjects().then(setSubjects);
+    },
     []
   );
+
+  if (account === undefined) return <div className="boot">Loading…</div>;
+
+  if (account === null) {
+    return <AuthGate onReady={(a) => setAccount(a)} />;
+  }
 
   if (error) {
     return (
@@ -82,8 +138,30 @@ export default function Page() {
 
       <header className="hud hud-top">
         <div>
-          <p className="hud-eyebrow">Orrery · knowledge map</p>
-          <h1>{scene.subject.title}</h1>
+          <p className="hud-eyebrow">Orrery · {account.displayName}</p>
+          <div className="subject-row">
+            <select
+              id="subject-picker"
+              className="subject-picker"
+              value={subjectSlug}
+              onChange={(e) => {
+                setSubjectSlug(e.target.value);
+                setSelected(null);
+              }}
+            >
+              {!subjects.some((s) => s.slug === subjectSlug) && (
+                <option value={subjectSlug}>{scene.subject.title}</option>
+              )}
+              {subjects.map((s) => (
+                <option key={s.slug} value={s.slug}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
+            <button className="btn btn-add" onClick={() => setShowIngest(true)}>
+              + New subject
+            </button>
+          </div>
         </div>
         <dl className="counts">
           <div>
@@ -117,11 +195,15 @@ export default function Page() {
       {selected && (
         <TutorPanel
           node={selected}
-          userId={USER_ID}
+          userId={account.userId}
           nodesById={nodesById}
           onClose={() => setSelected(null)}
           onMasteryChange={handleMasteryChange}
         />
+      )}
+
+      {showIngest && (
+        <IngestPanel onCreated={handleIngested} onClose={() => setShowIngest(false)} />
       )}
     </main>
   );
