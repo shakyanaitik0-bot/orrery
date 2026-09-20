@@ -91,6 +91,28 @@ class User(Base):
     tenant: Mapped[Tenant] = relationship(back_populates="users")
 
 
+class Session(Base):
+    """A bearer-token session for a user.
+
+    This is the stand-in for Clerk's JWT while there's no Clerk account yet:
+    `/api/auth/start` issues a token here, and every request that needs to
+    know who's asking presents it as `Authorization: Bearer <token>` rather
+    than a client-supplied user id. Only `token_hash` is stored, so a
+    database read alone can't be replayed as a session.
+    """
+
+    __tablename__ = "sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class GuardianLink(Base):
     """Guardian-to-learner link, taken from Open Alpha's invite-code flow.
 

@@ -12,6 +12,7 @@ from database import get_session
 from models import Concept, ConceptEdge, EdgeType, Subject
 from services.learning.ingest import IngestError, extract_concept_graph
 from services.learning.pdf import PdfExtractionError, extract_text
+from services.learning.youtube import YoutubeExtractionError, fetch_transcript
 from services.llm.registry import get_client
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
@@ -22,6 +23,11 @@ MAX_PDF_BYTES = 15 * 1024 * 1024  # 15 MB
 class NotesIn(BaseModel):
     text: str = Field(min_length=1, max_length=20000)
     # Optional: force the subject title/slug rather than letting the model pick.
+    title: str | None = None
+
+
+class YoutubeIn(BaseModel):
+    url: str = Field(min_length=1, max_length=500)
     title: str | None = None
 
 
@@ -112,3 +118,19 @@ async def ingest_pdf(
 
     # Let the model choose the title from the content; no forced override.
     return await _build_subject(session, text, title=None)
+
+
+@router.post("/youtube")
+async def ingest_youtube(body: YoutubeIn, session: AsyncSession = Depends(get_session)):
+    """Paste a YouTube link; get back a subject built from its transcript.
+
+    Reads whatever caption track the video already has — no video download,
+    no YouTube API key. A video with captions disabled has nothing to
+    extract, and is rejected with a clear reason.
+    """
+    try:
+        text = fetch_transcript(body.url)
+    except YoutubeExtractionError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    return await _build_subject(session, text, body.title)

@@ -16,12 +16,10 @@ const GRADES: { label: string; quality: number; tone: string }[] = [
 ];
 
 export default function ReviewPanel({
-  userId,
   subjectSlug,
   onClose,
   onMasteryChange,
 }: {
-  userId: string;
   subjectSlug: string;
   onClose: () => void;
   onMasteryChange: (conceptId: string, mastery: number) => void;
@@ -34,10 +32,10 @@ export default function ReviewPanel({
   const [done, setDone] = useState(0);
 
   useEffect(() => {
-    fetchDueCards(userId, subjectSlug)
+    fetchDueCards(subjectSlug)
       .then(setCards)
       .catch((e) => setError(e instanceof Error ? e.message : "Could not load the queue."));
-  }, [userId, subjectSlug]);
+  }, [subjectSlug]);
 
   const current = cards?.[index];
 
@@ -45,7 +43,7 @@ export default function ReviewPanel({
     if (!current || busy) return;
     setBusy(true);
     try {
-      const result = await gradeCard(userId, current.id, quality);
+      const result = await gradeCard(current.id, quality);
       onMasteryChange(current.conceptId, result.mastery);
       setDone((d) => d + 1);
       setRevealed(false);

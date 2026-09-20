@@ -29,7 +29,7 @@ export default function AuthGate({ onReady }: { onReady: (account: Account) => v
     try {
       const account = await startAccount(displayName, level);
       try {
-        localStorage.setItem("orrery.userId", account.userId);
+        localStorage.setItem("orrery.sessionToken", account.sessionToken);
         localStorage.setItem("orrery.displayName", account.displayName);
       } catch {
         /* private window or blocked storage — the session still works, it

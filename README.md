@@ -29,14 +29,22 @@ learner's real mastery drives what you see:
 - **Recording an answer** runs Bayesian Knowledge Tracing in Rust, writes the
   new probability, and re-evaluates what is unlocked.
 - **Signing in** creates a real account (name + level, no password) and a
-  personal tenant — no more hardcoded demo user.
-- **Pasting notes or uploading a PDF** ("+ New subject") builds a new concept
-  graph through the same LLM interface the tutor uses, and drops you straight
-  into the resulting map. A PDF with a real text layer works the same way as
-  pasted notes — scanned, image-only PDFs are rejected with a clear error.
+  personal tenant, and issues a bearer session token — every request that
+  touches a learner's data is authenticated by that token, not by a
+  client-supplied id, so one account cannot read or write another's mastery,
+  chat history, or review cards. See "Real identity" below for what this is
+  still a stand-in for.
+- **Pasting notes, uploading a PDF, or pasting a YouTube link** ("+ New
+  subject") all build a new concept graph through the same LLM interface the
+  tutor uses, and drop you straight into the resulting map. A PDF needs a
+  real text layer; a YouTube video needs captions — both are rejected with a
+  clear error otherwise, no OCR or audio transcription attempted.
 - **Reviewing flashcards** ("Review") runs a per-concept SM-2 deck, generated
   automatically the first time you open a subject. Grading a card feeds the
   same BKT mastery update as the tutor, so the map and the deck agree.
+- **Three built-in subjects** — Algebra, Cell Biology, and Programming
+  Fundamentals — each with real prerequisite structure, plus whatever you
+  ingest yourself.
 
 ## Quick start
 
@@ -45,20 +53,28 @@ Two terminals. Python 3.11+, Node 20+, and a Rust toolchain.
 ```bash
 # 1. Build the Rust engine into the Python environment
 python3 -m venv .venv && source .venv/bin/activate
-pip install maturin fastapi "uvicorn[standard]" "sqlalchemy[asyncio]" \
-            aiosqlite asyncpg pydantic-settings boto3
+pip install maturin -r apps/api/requirements.txt
 (cd packages/engine-py && maturin develop --release)
 
-# 2. Seed and run the API
-cd apps/api && python seed.py && uvicorn main:app --port 8000
+# 2. (optional) Start Postgres — see "Postgres" below. Skipping this runs
+#    on a local SQLite file instead, which is fine for a quick look.
+docker compose up -d
+
+# 3. Apply migrations, seed, and run the API
+cd apps/api
+alembic upgrade head
+python seed.py && uvicorn main:app --port 8000
 ```
 
 ```bash
-# 3. Run the web app (second terminal)
+# 4. Run the web app (second terminal)
 cd apps/web && npm install && npm run dev
 ```
 
-Open <http://localhost:3000>. `seed.py` prints the demo learner's id.
+Open <http://localhost:3000> and sign in with any name — that creates a real
+account. `seed.py` seeds a separate "Demo Learner" account with pre-filled
+progress, for reference; there's no login-as-that-user flow, since the app
+has no password-based login yet (see "Real identity" below).
 
 Without AWS credentials the tutor runs on an offline stub that says so in its
 own output — the map, the graph and all mastery scoring are fully live either
@@ -86,14 +102,36 @@ payloads, so switching to Llama or Mistral on Bedrock is a model-id change.
 
 SQLite is the default only so a fresh clone runs. Point it at Postgres and the
 same models work unchanged — `apps/api/database.py` resolves UUID and JSON
-columns per dialect:
+columns per dialect. `docker-compose.yml` at the repo root starts a local one:
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://user:pass@host/orrery
+docker compose up -d     # postgres:16, user/pass/db all "orrery", port 5432
+export DATABASE_URL=postgresql+asyncpg://orrery:orrery@localhost/orrery
+cd apps/api && alembic upgrade head && python seed.py
 ```
 
 This is the deliberate inverse of OpenTutor, which raises unless the URL is
-SQLite. See [docs/MERGE-DECISIONS.md](docs/MERGE-DECISIONS.md).
+SQLite. See [docs/MERGE-DECISIONS.md](docs/MERGE-DECISIONS.md). Verified
+against a real Postgres 16 instance, not just SQLite — schema, auth, and
+mastery scoring all checked out.
+
+### Migrations
+
+Alembic lives in `apps/api/migrations/`, wired to the app's own `Settings`
+(`migrations/env.py` reads `DATABASE_URL`, so it always targets whatever
+database the API itself is configured for) and to `Base.metadata`, so
+`alembic revision --autogenerate` picks up model changes automatically.
+
+```bash
+cd apps/api
+alembic upgrade head                          # apply
+alembic revision --autogenerate -m "message"  # after changing models/
+```
+
+One thing autogenerate can't see: the app's custom `GUID`/`JSONDict` column
+types aren't part of SQLAlchemy's own vocabulary, so every migration file
+needs `import database` — `migrations/script.py.mako` adds it automatically
+for new ones.
 
 ## Licensing
 
@@ -110,15 +148,22 @@ prompts, the education ladder — the code is written fresh. See
 
 Named plainly so nothing here looks more finished than it is:
 
-- **Real identity.** `POST /api/auth/start` is a working stand-in for Clerk —
-  a name creates a real account with no password, because none are collected.
-  `User.external_id` is still the seam for swapping in Clerk later; see
-  `apps/api/routers/auth.py`.
-- **YouTube ingestion.** PDFs and pasted text both build a concept graph now
-  (`POST /api/ingest/notes`, `POST /api/ingest/pdf`); turning a video
-  transcript into text is the still-missing mechanical step.
-- **Migrations.** Tables are created from the models; Alembic is not set up.
-- **Curriculum.** One seeded subject plus whatever you ingest. TinkerSchool's
-  81 migrations and Open Alpha's subject JSON are not imported.
-- **Row-level tenant scoping.** Every model carries `tenant_id`/`user_id`,
-  but nothing yet stops one tenant's API calls from reading another's data.
+- **Real identity.** `POST /api/auth/start` is a working stand-in for Clerk:
+  a name creates a real account with no password, because none are
+  collected, and a bearer session token (`apps/api/security.py`) is what
+  actually gates access to a learner's data — not the account name or id.
+  What this stand-in is still missing is anything Clerk would add: password
+  or social login, email verification, multi-device session management,
+  revoking a stolen token before it expires on its own. `User.external_id`
+  is still the seam for swapping in real Clerk later; see
+  `apps/api/routers/auth.py`. **This needs a Clerk account and API keys to
+  finish — ask if you want to set that up.**
+- **Curriculum.** Three seeded subjects (Algebra, Cell Biology, Programming
+  Fundamentals) plus whatever you ingest. TinkerSchool's 81 migrations and
+  Open Alpha's subject JSON are not imported.
+- **Subjects are shared, not tenant-scoped.** A subject anyone ingests is
+  visible to every account — mastery, review cards, and chat are private per
+  learner (enforced by the session-token auth above), but the concept graphs
+  themselves are a shared catalog, closer to a public wiki than private
+  files. Scoping subjects to a tenant, if that's wanted, is a schema change
+  (a `tenant_id` on `Subject`), not just an API check.

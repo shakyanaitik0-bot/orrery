@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 
-import { ingestNotes, ingestPdf } from "@/lib/api";
+import { ingestNotes, ingestPdf, ingestYoutube } from "@/lib/api";
 
-type Mode = "notes" | "pdf";
+type Mode = "notes" | "pdf" | "youtube";
 
 export default function IngestPanel({
   onCreated,
@@ -17,12 +17,18 @@ export default function IngestPanel({
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ concepts: number; edges: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const canSubmit = mode === "notes" ? text.trim().length >= 40 : file !== null;
+  const canSubmit =
+    mode === "notes"
+      ? text.trim().length >= 40
+      : mode === "pdf"
+      ? file !== null
+      : youtubeUrl.trim().length > 0;
 
   async function submit() {
     if (!canSubmit || busy) return;
@@ -32,7 +38,9 @@ export default function IngestPanel({
       const res =
         mode === "notes"
           ? await ingestNotes(text.trim(), title.trim() || undefined)
-          : await ingestPdf(file as File);
+          : mode === "pdf"
+          ? await ingestPdf(file as File)
+          : await ingestYoutube(youtubeUrl.trim(), title.trim() || undefined);
       setResult({ concepts: res.conceptCount, edges: res.edgeCount });
       setTimeout(() => onCreated(res.subject.slug), 900);
     } catch (e) {
@@ -69,6 +77,13 @@ export default function IngestPanel({
           >
             Upload PDF
           </button>
+          <button
+            className={`mode-tab ${mode === "youtube" ? "is-active" : ""}`}
+            onClick={() => setMode("youtube")}
+            disabled={busy}
+          >
+            YouTube link
+          </button>
         </div>
 
         {mode === "notes" ? (
@@ -99,7 +114,7 @@ export default function IngestPanel({
               />
             </label>
           </>
-        ) : (
+        ) : mode === "pdf" ? (
           <>
             <p className="panel-summary">
               Upload a PDF with a real text layer — lecture slides, a chapter, a
@@ -129,6 +144,34 @@ export default function IngestPanel({
                 </>
               )}
             </div>
+          </>
+        ) : (
+          <>
+            <p className="panel-summary">
+              Paste a YouTube link. This reads the video's existing captions —
+              if captions are turned off for that video, there's nothing to
+              build from.
+            </p>
+            <label className="field">
+              <span>Title (optional)</span>
+              <input
+                id="ingest-yt-title"
+                value={title}
+                placeholder="Leave blank to let it name itself"
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={busy}
+              />
+            </label>
+            <label className="field">
+              <span>Video URL</span>
+              <input
+                id="ingest-yt-url"
+                value={youtubeUrl}
+                placeholder="https://www.youtube.com/watch?v=…"
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                disabled={busy}
+              />
+            </label>
           </>
         )}
 

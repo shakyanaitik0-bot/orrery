@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
-from models import Concept, ConceptEdge, Mastery, Subject
+from models import Concept, ConceptEdge, Mastery, Subject, User
+from security import get_current_user
 from services.learning import mastery as mastery_service
 from services.learning.layout import build_scene
 
@@ -16,7 +17,6 @@ router = APIRouter(prefix="/api/graph", tags=["graph"])
 
 
 class AnswerIn(BaseModel):
-    user_id: uuid.UUID
     concept_id: uuid.UUID
     correct: bool
 
@@ -34,8 +34,8 @@ async def list_subjects(session: AsyncSession = Depends(get_session)):
 @router.get("/scene/{subject_slug}")
 async def scene(
     subject_slug: str,
-    user_id: uuid.UUID | None = None,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """The positioned graph for one subject, with this learner's mastery."""
     subject = (
@@ -52,12 +52,10 @@ async def scene(
     edges = (await session.execute(select(ConceptEdge))).scalars().all()
     edges = [e for e in edges if e.source_id in concept_ids and e.target_id in concept_ids]
 
-    mastery_map: dict[str, float] = {}
-    if user_id is not None:
-        rows = (
-            await session.execute(select(Mastery).where(Mastery.user_id == user_id))
-        ).scalars().all()
-        mastery_map = {str(m.concept_id): m.probability for m in rows}
+    rows = (
+        await session.execute(select(Mastery).where(Mastery.user_id == user.id))
+    ).scalars().all()
+    mastery_map = {str(m.concept_id): m.probability for m in rows}
 
     payload = build_scene(
         concepts=[
@@ -86,10 +84,14 @@ async def scene(
 
 
 @router.post("/answer")
-async def submit_answer(body: AnswerIn, session: AsyncSession = Depends(get_session)):
+async def submit_answer(
+    body: AnswerIn,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """Record one answer. Mastery is recomputed by the Rust engine."""
     row = await mastery_service.record_answer(
-        session, body.user_id, body.concept_id, body.correct
+        session, user.id, body.concept_id, body.correct
     )
     return {
         "conceptId": str(row.concept_id),

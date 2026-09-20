@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import SessionLocal, get_session
 from models import ChatTurn, Concept, Mastery, User
+from security import get_current_user
 from services.learning.tutor import system_prompt
 from services.llm.registry import get_client
 
@@ -17,33 +18,33 @@ router = APIRouter(prefix="/api/tutor", tags=["tutor"])
 
 
 class AskIn(BaseModel):
-    user_id: uuid.UUID
     concept_id: uuid.UUID
     message: str
     learning_style: str = "reading"
 
 
-async def _context(session: AsyncSession, body: AskIn):
+async def _context(session: AsyncSession, user: User, body: AskIn):
     concept = await session.get(Concept, body.concept_id)
     if concept is None:
         raise HTTPException(404, "Unknown concept")
-    user = await session.get(User, body.user_id)
-    if user is None:
-        raise HTTPException(404, "Unknown user")
     row = (
         await session.execute(
             select(Mastery).where(
-                Mastery.user_id == body.user_id, Mastery.concept_id == body.concept_id
+                Mastery.user_id == user.id, Mastery.concept_id == body.concept_id
             )
         )
     ).scalar_one_or_none()
-    return concept, user, (row.probability if row else 0.0)
+    return concept, (row.probability if row else 0.0)
 
 
 @router.post("/ask")
-async def ask(body: AskIn, session: AsyncSession = Depends(get_session)):
+async def ask(
+    body: AskIn,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """Stream a tutor reply, then persist the exchange."""
-    concept, user, mastery = await _context(session, body)
+    concept, mastery = await _context(session, user, body)
     prompt = system_prompt(
         concept_title=concept.title,
         concept_summary=concept.summary,
@@ -79,14 +80,16 @@ async def ask(body: AskIn, session: AsyncSession = Depends(get_session)):
     return StreamingResponse(stream(), media_type="text/plain; charset=utf-8")
 
 
-@router.get("/history/{user_id}/{concept_id}")
+@router.get("/history/{concept_id}")
 async def history(
-    user_id: uuid.UUID, concept_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    concept_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     rows = (
         await session.execute(
             select(ChatTurn)
-            .where(ChatTurn.user_id == user_id, ChatTurn.concept_id == concept_id)
+            .where(ChatTurn.user_id == user.id, ChatTurn.concept_id == concept_id)
             .order_by(ChatTurn.created_at)
         )
     ).scalars().all()

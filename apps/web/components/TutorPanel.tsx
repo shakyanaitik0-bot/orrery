@@ -12,13 +12,11 @@ interface Turn {
 
 export default function TutorPanel({
   node,
-  userId,
   nodesById,
   onClose,
   onMasteryChange,
 }: {
   node: SceneNode;
-  userId: string;
   nodesById: Map<string, SceneNode>;
   onClose: () => void;
   onMasteryChange: (conceptId: string, mastery: number) => void;
@@ -48,7 +46,7 @@ export default function TutorPanel({
     setTurns((t) => [...t, { role: "user", content: message }, { role: "tutor", content: "" }]);
 
     try {
-      await askTutor(userId, node.id, message, (chunk) => {
+      await askTutor(node.id, message, (chunk) => {
         setTurns((t) => {
           const next = [...t];
           next[next.length - 1] = {
@@ -68,7 +66,7 @@ export default function TutorPanel({
 
   async function grade(correct: boolean) {
     try {
-      const result = await submitAnswer(userId, node.id, correct);
+      const result = await submitAnswer(node.id, correct);
       onMasteryChange(node.id, result.mastery);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not record that.");

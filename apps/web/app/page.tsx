@@ -35,14 +35,14 @@ export default function Page() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let storedId: string | null = null;
+      let storedToken: string | null = null;
       try {
-        storedId = localStorage.getItem("orrery.userId");
+        storedToken = localStorage.getItem("orrery.sessionToken");
       } catch {
         /* private window or blocked storage */
       }
-      if (storedId) {
-        const restored = await restoreAccount(storedId);
+      if (storedToken) {
+        const restored = await restoreAccount(storedToken);
         if (!cancelled) setAccount(restored);
       } else if (!cancelled) {
         setAccount(null);
@@ -53,8 +53,8 @@ export default function Page() {
     };
   }, []);
 
-  const loadScene = useCallback((slug: string, userId: string) => {
-    fetchScene(slug, userId)
+  const loadScene = useCallback((slug: string) => {
+    fetchScene(slug)
       .then((s) => {
         setScene(s);
         setError(null);
@@ -64,7 +64,7 @@ export default function Page() {
 
   useEffect(() => {
     if (!account) return;
-    loadScene(subjectSlug, account.userId);
+    loadScene(subjectSlug);
     fetchProvider().then((p) => setProvider(p.provider));
     listSubjects().then(setSubjects);
   }, [account, subjectSlug, loadScene]);
@@ -90,7 +90,7 @@ export default function Page() {
           : prev
       );
       try {
-        const fresh = await fetchScene(subjectSlug, account.userId);
+        const fresh = await fetchScene(subjectSlug);
         setScene(fresh);
         setSelected((s) => (s ? fresh.nodes.find((n) => n.id === s.id) ?? null : null));
       } catch {
@@ -200,7 +200,6 @@ export default function Page() {
       {selected && (
         <TutorPanel
           node={selected}
-          userId={account.userId}
           nodesById={nodesById}
           onClose={() => setSelected(null)}
           onMasteryChange={handleMasteryChange}
@@ -213,7 +212,6 @@ export default function Page() {
 
       {showReview && (
         <ReviewPanel
-          userId={account.userId}
           subjectSlug={subjectSlug}
           onClose={() => setShowReview(false)}
           onMasteryChange={handleMasteryChange}
