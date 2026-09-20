@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AuthGate from "@/components/AuthGate";
 import IngestPanel from "@/components/IngestPanel";
+import ReviewPanel from "@/components/ReviewPanel";
 import TutorPanel from "@/components/TutorPanel";
 import { fetchProvider, fetchScene, listSubjects, restoreAccount } from "@/lib/api";
 import type { Account } from "@/lib/api";
@@ -28,6 +29,7 @@ export default function Page() {
   const [provider, setProvider] = useState<string>("…");
   const [error, setError] = useState<string | null>(null);
   const [showIngest, setShowIngest] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   // Restore a stored account on load, falling back to the auth gate.
   useEffect(() => {
@@ -161,6 +163,9 @@ export default function Page() {
             <button className="btn btn-add" onClick={() => setShowIngest(true)}>
               + New subject
             </button>
+            <button className="btn btn-review" onClick={() => setShowReview(true)}>
+              Review
+            </button>
           </div>
         </div>
         <dl className="counts">
@@ -204,6 +209,15 @@ export default function Page() {
 
       {showIngest && (
         <IngestPanel onCreated={handleIngested} onClose={() => setShowIngest(false)} />
+      )}
+
+      {showReview && (
+        <ReviewPanel
+          userId={account.userId}
+          subjectSlug={subjectSlug}
+          onClose={() => setShowReview(false)}
+          onMasteryChange={handleMasteryChange}
+        />
       )}
     </main>
   );

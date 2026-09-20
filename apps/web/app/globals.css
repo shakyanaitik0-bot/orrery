@@ -383,3 +383,86 @@ body {
 .modal .panel-summary { margin-bottom: 6px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .ingest-success { color: var(--mastered); font-size: 13.5px; margin: 0; }
+
+/* ---------- review button + panel ---------- */
+
+.btn-review {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-color: var(--learning);
+  color: var(--learning);
+}
+.btn-review:hover { background: rgba(224, 179, 65, 0.08); }
+
+.review-modal { gap: 14px; }
+.review-progress {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+
+.flashcard {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 34px 24px;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+.flashcard-eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0;
+}
+.flashcard-face { font-size: 18px; font-weight: 500; margin: 0; line-height: 1.4; }
+.flashcard-hint { font-size: 12px; color: var(--ink-3); margin: 0; }
+
+.review-reveal { align-self: stretch; padding: 11px; }
+
+.grade-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.grade-buttons .btn { padding: 10px 6px; font-size: 12.5px; }
+
+/* ---------- ingest mode tabs + dropzone ---------- */
+
+.mode-tabs { display: flex; gap: 6px; margin-bottom: 4px; }
+.mode-tab {
+  flex: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  color: var(--ink-3);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: var(--sans);
+  cursor: pointer;
+}
+.mode-tab.is-active { color: var(--ink); border-color: var(--open); background: rgba(90, 169, 199, 0.1); }
+.mode-tab:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.dropzone {
+  border: 1px dashed var(--rule);
+  border-radius: 6px;
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.dropzone:hover { border-color: var(--open); }
+.dropzone.has-file { border-style: solid; border-color: var(--mastered); color: var(--ink); }
+.dropzone span { font-size: 12px; color: var(--ink-3); }

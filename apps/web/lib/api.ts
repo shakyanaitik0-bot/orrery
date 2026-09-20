@@ -106,3 +106,51 @@ export async function listSubjects(): Promise<
   if (!res.ok) return [];
   return res.json();
 }
+
+
+export interface ReviewCard {
+  id: string;
+  conceptId: string;
+  conceptTitle: string;
+  front: string;
+  back: string;
+}
+
+export async function fetchDueCards(userId: string, subjectSlug: string): Promise<ReviewCard[]> {
+  const res = await fetch(`/api/review/due/${userId}/${subjectSlug}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Could not load the review queue (${res.status})`);
+  const data = await res.json();
+  return data.cards;
+}
+
+export interface GradeResult {
+  cardId: string;
+  nextDueAt: string | null;
+  intervalDays: number;
+  mastery: number;
+}
+
+export async function gradeCard(
+  userId: string,
+  cardId: string,
+  quality: number
+): Promise<GradeResult> {
+  const res = await fetch("/api/review/grade", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, card_id: cardId, quality }),
+  });
+  if (!res.ok) throw new Error(`Could not record that review (${res.status})`);
+  return res.json();
+}
+
+export async function ingestPdf(file: File): Promise<IngestResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/ingest/pdf", { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Could not read that PDF (${res.status})`);
+  }
+  return res.json();
+}

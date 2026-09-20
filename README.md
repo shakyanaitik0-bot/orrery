@@ -30,9 +30,13 @@ learner's real mastery drives what you see:
   new probability, and re-evaluates what is unlocked.
 - **Signing in** creates a real account (name + level, no password) and a
   personal tenant — no more hardcoded demo user.
-- **Pasting notes** ("+ New subject") builds a new concept graph from raw
-  text through the same LLM interface the tutor uses, and drops you straight
-  into the resulting map.
+- **Pasting notes or uploading a PDF** ("+ New subject") builds a new concept
+  graph through the same LLM interface the tutor uses, and drops you straight
+  into the resulting map. A PDF with a real text layer works the same way as
+  pasted notes — scanned, image-only PDFs are rejected with a clear error.
+- **Reviewing flashcards** ("Review") runs a per-concept SM-2 deck, generated
+  automatically the first time you open a subject. Grading a card feeds the
+  same BKT mastery update as the tutor, so the map and the deck agree.
 
 ## Quick start
 
@@ -110,11 +114,9 @@ Named plainly so nothing here looks more finished than it is:
   a name creates a real account with no password, because none are collected.
   `User.external_id` is still the seam for swapping in Clerk later; see
   `apps/api/routers/auth.py`.
-- **PDF and YouTube ingestion.** `POST /api/ingest/notes` takes pasted text
-  straight through to a concept graph. Getting a PDF or a transcript down to
-  text is a separate, mechanical step the pipeline doesn't need to know
-  about — it's just not wired up yet.
-- **Flashcard review UI.** SM-2 runs and is wired, but nothing drives it.
+- **YouTube ingestion.** PDFs and pasted text both build a concept graph now
+  (`POST /api/ingest/notes`, `POST /api/ingest/pdf`); turning a video
+  transcript into text is the still-missing mechanical step.
 - **Migrations.** Tables are created from the models; Alembic is not set up.
 - **Curriculum.** One seeded subject plus whatever you ingest. TinkerSchool's
   81 migrations and Open Alpha's subject JSON are not imported.
