@@ -1,0 +1,104 @@
+# skillcoco-core — adaptive learning algorithms for desktop, web, and WASM.
+#
+# API UNSTABLE until 1.0.0. Breaking changes permitted in any 0.x release.
+# Pin to a specific minor (`skillcoco-core = "0.1"`) and read CHANGELOG.md
+# before upgrading. See README.md for the full publishing-status note and
+# crates.io plans (Phase 8).
+
+[package]
+name = "skillcoco-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Adaptive learning algorithms (BKT, SM-2, threshold, microlearning selection, signing, packs) — desktop/web/WASM portable."
+repository = "https://github.com/skillcoco/skillcoco"
+homepage = "https://github.com/skillcoco/skillcoco"
+documentation = "https://docs.rs/skillcoco-core"
+readme = "README.md"
+keywords = ["adaptive-learning", "bkt", "spaced-repetition", "sm2", "education"]
+categories = ["algorithms", "science"]
+authors = ["School of DevOps & AI"]
+
+# ---------------------------------------------------------------------------
+# Standard Stack (07-RESEARCH.md). Every dep here is portable to
+# wasm32-unknown-unknown (with the per-target overrides below for getrandom).
+# Anti-leakage invariant (D-02): no rusqlite, no tauri, no printpdf, no image,
+# no qrcode, no reqwest, no tokio, no async-trait may appear in [dependencies].
+# CI in Wave 9 asserts this; Wave 1 documents the convention.
+# ---------------------------------------------------------------------------
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+# thiserror used at minimum by `bkt::BktError` (Wave 2). Workspace-pinned.
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+uuid = { version = "1", features = ["v4","serde"] }
+ed25519-dalek = { version = "2.2", features = ["pkcs8","rand_core","pem"] }
+pkcs8 = { version = "0.10", features = ["pem","alloc"] }
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.21"
+rand = "0.8"
+jsonschema = "0.46"
+include_dir = "0.7"
+
+[dev-dependencies]
+tempfile = "3"
+
+# ---------------------------------------------------------------------------
+# WASM target overrides (R1 / Pitfall 2 / Pitfall 10).
+#
+# Two getrandom versions live in the dependency graph today:
+#   - getrandom 0.3 is pulled by ahash, jsonschema, and (when rand 0.9
+#     lands) ed25519-dalek's rand_core 0.9.
+#   - getrandom 0.2 is pulled transitively by rand 0.8 → rand_core 0.6,
+#     which is what ed25519-dalek 2.x currently uses.
+#
+# Cargo only honors a wasm backend feature when SOME crate in the graph
+# declares it on that exact getrandom MAJOR. We therefore declare BOTH:
+#   - getrandom 0.3 with `wasm_js` (renamed from `js` in 0.3.x)
+#   - getrandom 0.2 with `js` (legacy spelling for the 0.2 line)
+#
+# Without the 0.2 declaration, `cargo build --target wasm32-unknown-unknown`
+# fails with `error: the wasm*-unknown-unknown targets are not supported by
+# default, you may need to enable the "js" feature.` This was 07-RESEARCH
+# Pitfall 2 — adjusted here for the actual graph shape observed at
+# implementation time. Wave 5 (signing move) revisits when ed25519-dalek
+# is fully migrated.
+#
+# wasm-bindgen-test as a dev-dep is the D-04 prep for Wave 5 + Wave 9
+# WASM smoke tests. Gating it behind cfg(target_arch = "wasm32") keeps it
+# out of host-target test builds.
+# ---------------------------------------------------------------------------
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+# ---------------------------------------------------------------------------
+# docs.rs metadata (R7 / 08-RESEARCH Pitfall 5).
+#
+# Required as of 2026-05-01: docs.rs reduced its default-target set to a
+# single host target (x86_64-unknown-linux-gnu). Without this block our
+# wasm32-unknown-unknown portability story — and the per-target getrandom
+# wiring above — would not render in the published docs.
+#
+# `all-features = true` ensures any future feature-gated items (cfg(feature
+# = "...")) appear. `--cfg docsrs` enables the standard `#[cfg(docsrs)]`
+# rustdoc gate for items that should only appear in docs.rs output (e.g.
+# `#[cfg_attr(docsrs, doc(cfg(...)))]` annotations).
+#
+# Source: docs.rs/about/metadata + blog.rust-lang.org/2026/04/04/docsrs-only-default-targets
+# ---------------------------------------------------------------------------
+[package.metadata.docs.rs]
+all-features = true
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "wasm32-unknown-unknown",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+rustdoc-args = ["--cfg", "docsrs"]

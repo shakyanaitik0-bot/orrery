@@ -1,0 +1,16 @@
+[package]
+name = "orrery-engine"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Python bindings for the Orrery adaptive learning engine (vendored skillcoco-core, MIT)."
+
+[lib]
+name = "orrery_engine"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
+skillcoco-core = { path = "../engine" }
+
+[workspace]

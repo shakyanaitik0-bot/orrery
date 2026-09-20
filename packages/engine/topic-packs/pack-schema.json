@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillcoco.dev/schemas/pack-schema-v1.json",
+  "title": "SkillCoco Topic Pack",
+  "description": "Schema for SkillCoco topic packs (D-02, Draft 2020-12). Pack-level additionalProperties is true (Q7 lock) to keep evolving fields non-breaking. Per-module strings carry maxLength caps as R1 prompt-injection mitigation.",
+  "type": "object",
+  "required": ["id", "title", "description", "domain_module", "modules"],
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "$comment": "Authored packs (no exportVersion) keep strict kebab-case ids + a curated domain enum. Exported courses carry exportVersion and bare-UUID runtime ids + the wizard-default 'general' domain; import re-namespaces every id (D-06), so the format gate has no safety value there and would break the D-05 round-trip. This conditional applies the strict authored constraints only when exportVersion is absent.",
+      "if": { "not": { "required": ["exportVersion"] } },
+      "then": {
+        "properties": {
+          "id": { "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+          "domain_module": { "enum": ["programming", "devops", "cloud", "concepts", "data"] },
+          "modules": {
+            "items": { "properties": { "id": { "pattern": "^[a-z][a-z0-9-]{2,63}$" } } }
+          },
+          "edges": {
+            "items": {
+              "properties": {
+                "from": { "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+                "to": { "pattern": "^[a-z][a-z0-9-]{2,63}$" }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Identifier. Authored packs: kebab-case matching directory name (enforced by the authored-only conditional). Exported courses: bare runtime id (re-namespaced on import)."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "domain_module": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Authored packs are restricted to the curated enum via the authored-only conditional. Exported courses carry the runtime value verbatim (e.g. the wizard default 'general')."
+    },
+    "estimated_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    },
+    "pack_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "default": "1.0",
+      "description": "Author-controlled semantic version. D-01 extension; optional, defaults to '1.0'."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["bundled", "skill"],
+      "description": "Derived at load time (NOT authored). Listed for schema completeness."
+    },
+    "requires_docker": {
+      "type": "boolean",
+      "default": false,
+      "description": "Informational only (Q5 lock). Per-lab `requires_docker` is the authoritative runtime gate."
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": { "$ref": "#/$defs/Module" }
+    },
+    "edges": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/Edge" }
+    },
+    "exportVersion": {
+      "type": "string",
+      "maxLength": 32,
+      "description": "Semver of the exporter that produced this file. Absent on authored packs; its presence relaxes the authored id/domain constraints (see top-level allOf)."
+    },
+    "exportedAt": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "RFC3339 timestamp. Absent on authored packs."
+    },
+    "exportedFrom": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Provenance marker, e.g. 'imported:my-export.json'. D-06. For licensed packs, encoded as 'licensed:{id}|{licensor}' (pipe-delimited, g73)."
+    },
+    "licensor": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Optional licensing-entity display name. Currently carried inside exportedFrom as 'licensed:{id}|{licensor}'; reserved here for a future dedicated field."
+    },
+    "blocks": {
+      "type": "object",
+      "description": "Map of module_id -> array of ModuleBlock rows (D-02 fidelity).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/ExportedBlock" }
+      }
+    },
+    "labs": {
+      "type": "object",
+      "description": "Map of module_id -> array of lab specs (D-03 image-ref only).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/ExportedLab" }
+      }
+    },
+    "videos": {
+      "type": "object",
+      "description": "Map of section_id -> array of cached LessonVideo rows (D-04).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/ExportedVideo" }
+      }
+    },
+    "signature": {
+      "$ref": "#/$defs/SignatureBlock",
+      "description": "Optional Phase 14 pack-signing envelope (D-04 minimal shape). NOT in the top-level `required` array — unsigned free packs stay schema-valid (D-09). Fields inside this block are NOT covered by the signature itself."
+    },
+    "skills": {
+      "type": "array",
+      "maxItems": 30,
+      "items": { "$ref": "#/$defs/SkillTag" },
+      "description": "Phase 18 (D-03.1) — optional course-level capability-tag list (D-01 can-do phrasing). Never required; externally produced/licensed packs without this field must stay importable (COORDINATION.md)."
+    }
+  },
+  "$defs": {
+    "SignatureBlock": {
+      "type": "object",
+      "required": ["alg", "issuerCert", "keyFingerprint", "sig"],
+      "additionalProperties": false,
+      "properties": {
+        "alg":            { "type": "string", "maxLength": 32, "description": "Signature algorithm identifier — always 'ed25519' in Phase 14." },
+        "issuerCert":     { "$ref": "#/$defs/IssuerCert" },
+        "keyFingerprint": { "type": "string", "maxLength": 64, "description": "Hex fingerprint of the issuer signing key. String, never a number (Pitfall 3)." },
+        "sig":            { "type": "string", "maxLength": 256, "description": "Hex-encoded Ed25519 signature over JCS(pack minus signature). String, never a number (Pitfall 3)." }
+      }
+    },
+    "IssuerCert": {
+      "type": "object",
+      "required": ["issuerId", "name", "publicKeyPem", "rootSig"],
+      "additionalProperties": false,
+      "properties": {
+        "issuerId":     { "type": "string", "maxLength": 100, "description": "Stable issuer identity (tenant key for Hub). String, never a number (Pitfall 3)." },
+        "name":         { "type": "string", "maxLength": 200, "description": "Human-readable publisher name (rendered as React text child only)." },
+        "publicKeyPem": { "type": "string", "maxLength": 2000, "description": "PEM-encoded Ed25519 public key that signs packs for this issuer." },
+        "rootSig":      { "type": "string", "maxLength": 256, "description": "Hex-encoded root signature over JCS(cert minus rootSig). String, never a number (Pitfall 3)." }
+      }
+    },
+    "Module": {
+      "type": "object",
+      "required": ["id", "title", "description", "objectives"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Authored packs: kebab-case (enforced by the authored-only conditional). Exported courses: bare runtime module id (re-namespaced on import, D-06)."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "estimated_minutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 240
+        },
+        "objectives": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          },
+          "description": "R1 mitigation: maxItems: 12 + per-item maxLength: 280 caps prompt-injection payload size when objectives flow into PagePlanner."
+        },
+        "exercise_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["conceptual_qa", "code_challenge", "fill_in_blank"]
+          }
+        },
+        "skills": {
+          "type": "array",
+          "maxItems": 30,
+          "items": { "$ref": "#/$defs/SkillTag" },
+          "description": "Phase 18 (D-03.1) — optional per-module capability-tag list (D-01 can-do phrasing, D-02 many-to-many module<->skill mapping). Never required; externally produced/licensed packs without this field must stay importable (COORDINATION.md)."
+        }
+      }
+    },
+    "Edge": {
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Module id reference. Authored packs: kebab-case (enforced by the authored-only conditional). Exported courses: bare runtime module id."
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Module id reference. Authored packs: kebab-case (enforced by the authored-only conditional). Exported courses: bare runtime module id."
+        }
+      }
+    },
+    "ExportedBlock": {
+      "type": "object",
+      "required": ["id", "moduleId", "ordering", "blockType", "status", "paramsJson", "payloadJson"],
+      "additionalProperties": false,
+      "properties": {
+        "id":                { "type": "string", "maxLength": 100 },
+        "moduleId":          { "type": "string", "maxLength": 100 },
+        "ordering":          { "type": "integer" },
+        "blockType":         { "type": "string", "maxLength": 50 },
+        "status":            { "type": "string", "enum": ["ready"] },
+        "paramsJson":        { "type": "string", "maxLength": 65536 },
+        "payloadJson":       { "type": "string", "maxLength": 131072 },
+        "sourceAnchorsJson": { "type": "string", "maxLength": 16384 },
+        "metadataJson":      { "type": "string", "maxLength": 16384 },
+        "retryCount":        { "type": "integer", "minimum": 0 },
+        "createdAt":         { "type": "string", "maxLength": 64 },
+        "updatedAt":         { "type": "string", "maxLength": 64 }
+      }
+    },
+    "ExportedLab": {
+      "type": "object",
+      "required": ["slug", "title", "requiresDocker", "image", "steps"],
+      "additionalProperties": true,
+      "properties": {
+        "slug":           { "type": "string", "maxLength": 100 },
+        "title":          { "type": "string", "maxLength": 200 },
+        "requiresDocker": { "type": "boolean" },
+        "image":          { "type": ["string", "null"], "maxLength": 500 },
+        "steps":          { "type": "array", "maxItems": 30 }
+      }
+    },
+    "ExportedVideo": {
+      "type": "object",
+      "required": ["videoId", "title", "channelTitle", "relevanceScore"],
+      "additionalProperties": false,
+      "properties": {
+        "videoId":        { "type": "string", "maxLength": 50 },
+        "title":          { "type": "string", "maxLength": 500 },
+        "channelTitle":   { "type": "string", "maxLength": 200 },
+        "relevanceScore": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "SkillTag": {
+      "type": "object",
+      "required": ["label", "slug"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Can-do capability phrasing (D-01), e.g. 'can configure RBAC policies'. R1 mitigation: maxLength caps prompt-injection payload size."
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Normalized capability id (Pitfall 4) used for cross-track/whole-profile merge (D-04)."
+        }
+      }
+    }
+  }
+}
