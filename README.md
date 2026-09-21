@@ -16,8 +16,13 @@ said were the hard ones, and to give the rest of the work somewhere to land.
 
 ## What actually works
 
-Run it and you get a navigable 3D map of an Algebra concept graph where a
-learner's real mastery drives what you see:
+Signing in lands you on a **dashboard**: a grid of your subjects with
+progress stats (mastered/open/locked, average mastery). Clicking a subject
+opens the 3D map for just that one, with a "← Dashboard" button and a
+"Switch user" button in the map's header to sign out and let someone else
+use the same device.
+
+Inside a subject's map, a learner's real mastery drives what you see:
 
 - **Height is prerequisite depth**, computed server-side by longest path, so
   "up" means "further in".

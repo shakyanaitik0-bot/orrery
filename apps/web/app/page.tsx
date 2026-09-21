@@ -4,11 +4,12 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AuthGate from "@/components/AuthGate";
+import Dashboard from "@/components/Dashboard";
 import IngestPanel from "@/components/IngestPanel";
 import QuizPanel from "@/components/QuizPanel";
 import ReviewPanel from "@/components/ReviewPanel";
 import TutorPanel from "@/components/TutorPanel";
-import { fetchProvider, fetchScene, listSubjects, restoreAccount } from "@/lib/api";
+import { clearStoredAccount, fetchProvider, fetchScene, listSubjects, restoreAccount } from "@/lib/api";
 import type { Account } from "@/lib/api";
 import type { Scene, SceneNode } from "@/lib/types";
 
@@ -18,13 +19,12 @@ const KnowledgeMap = dynamic(() => import("@/components/KnowledgeMap"), {
   loading: () => <div className="boot">Loading the map…</div>,
 });
 
-const DEMO_SUBJECT = "algebra";
-
 export default function Page() {
   // `undefined` = still checking localStorage; `null` = no account yet.
   const [account, setAccount] = useState<Account | null | undefined>(undefined);
+  // The dashboard is the landing screen; picking a subject opens its map.
+  const [subjectSlug, setSubjectSlug] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<{ slug: string; title: string }[]>([]);
-  const [subjectSlug, setSubjectSlug] = useState(DEMO_SUBJECT);
   const [scene, setScene] = useState<Scene | null>(null);
   const [selected, setSelected] = useState<SceneNode | null>(null);
   const [provider, setProvider] = useState<string>("…");
@@ -64,11 +64,17 @@ export default function Page() {
       .catch((e) => setError(e.message));
   }, []);
 
+  // The subject list is used by the map's own picker; fetched once an
+  // account exists, independent of which subject (if any) is open.
   useEffect(() => {
     if (!account) return;
-    loadScene(subjectSlug);
     fetchProvider().then((p) => setProvider(p.provider));
     listSubjects().then(setSubjects);
+  }, [account]);
+
+  useEffect(() => {
+    if (!account || !subjectSlug) return;
+    loadScene(subjectSlug);
   }, [account, subjectSlug, loadScene]);
 
   const nodesById = useMemo(
@@ -91,6 +97,7 @@ export default function Page() {
             }
           : prev
       );
+      if (!subjectSlug) return;
       try {
         const fresh = await fetchScene(subjectSlug);
         setScene(fresh);
@@ -112,10 +119,38 @@ export default function Page() {
     []
   );
 
+  const handleSwitchUser = useCallback(() => {
+    clearStoredAccount();
+    setAccount(null);
+    setSubjectSlug(null);
+    setScene(null);
+    setSelected(null);
+    setSubjects([]);
+  }, []);
+
   if (account === undefined) return <div className="boot">Loading…</div>;
 
   if (account === null) {
     return <AuthGate onReady={(a) => setAccount(a)} />;
+  }
+
+  if (subjectSlug === null) {
+    return (
+      <>
+        <Dashboard
+          displayName={account.displayName}
+          onOpenSubject={(slug) => {
+            setSelected(null);
+            setSubjectSlug(slug);
+          }}
+          onNewSubject={() => setShowIngest(true)}
+          onSwitchUser={handleSwitchUser}
+        />
+        {showIngest && (
+          <IngestPanel onCreated={handleIngested} onClose={() => setShowIngest(false)} />
+        )}
+      </>
+    );
   }
 
   if (error) {
@@ -125,6 +160,9 @@ export default function Page() {
           <h1>The map could not load</h1>
           <p>{error}</p>
           <p className="hint">Start the API with <code>uvicorn main:app</code> on port 8000.</p>
+          <button className="btn" onClick={() => { setSubjectSlug(null); setError(null); }}>
+            ← Back to dashboard
+          </button>
         </div>
       </main>
     );
@@ -144,6 +182,15 @@ export default function Page() {
         <div>
           <p className="hud-eyebrow">Orrery · {account.displayName}</p>
           <div className="subject-row">
+            <button
+              className="btn"
+              onClick={() => {
+                setSubjectSlug(null);
+                setSelected(null);
+              }}
+            >
+              ← Dashboard
+            </button>
             <select
               id="subject-picker"
               className="subject-picker"
@@ -167,6 +214,9 @@ export default function Page() {
             </button>
             <button className="btn btn-review" onClick={() => setShowReview(true)}>
               Review
+            </button>
+            <button className="btn" onClick={handleSwitchUser}>
+              Switch user
             </button>
           </div>
         </div>

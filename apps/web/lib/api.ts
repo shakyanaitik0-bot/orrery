@@ -98,6 +98,17 @@ export async function startAccount(
   return data;
 }
 
+/** Clears the stored session so another learner can sign in on this device. */
+export function clearStoredAccount() {
+  setSessionToken(null);
+  try {
+    localStorage.removeItem("orrery.sessionToken");
+    localStorage.removeItem("orrery.displayName");
+  } catch {
+    /* private window or blocked storage */
+  }
+}
+
 /** Restores a session from a stored bearer token — called on page load. */
 export async function restoreAccount(token: string): Promise<Account | null> {
   setSessionToken(token);
@@ -133,6 +144,30 @@ export async function ingestNotes(text: string, title?: string): Promise<IngestR
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail || `Could not build a subject from that (${res.status})`);
   }
+  return res.json();
+}
+
+export interface DashboardSubject {
+  slug: string;
+  title: string;
+  description: string | null;
+  accent: string;
+  conceptCount: number;
+  mastered: number;
+  open: number;
+  locked: number;
+  averageMastery: number;
+}
+
+export async function fetchDashboard(): Promise<{
+  subjects: DashboardSubject[];
+  masteryThreshold: number;
+}> {
+  const res = await fetch("/api/graph/dashboard", {
+    cache: "no-store",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Could not load your progress (${res.status})`);
   return res.json();
 }
 

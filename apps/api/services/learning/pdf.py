@@ -26,6 +26,8 @@ def extract_text(data: bytes, max_pages: int = 60) -> str:
         reader = PdfReader(BytesIO(data))
     except PdfReadError as exc:
         raise PdfExtractionError(f"That doesn't look like a valid PDF: {exc}") from exc
+    except Exception as exc:  # noqa: BLE001 — pypdf raises assorted errors on malformed files
+        raise PdfExtractionError(f"Couldn't open that PDF: {exc}") from exc
 
     if reader.is_encrypted:
         # Try the empty password — plenty of "protected" PDFs are just that.
@@ -34,8 +36,11 @@ def extract_text(data: bytes, max_pages: int = 60) -> str:
         except Exception as exc:  # noqa: BLE001
             raise PdfExtractionError("This PDF is password-protected.") from exc
 
-    pages = reader.pages[:max_pages]
-    text = "\n\n".join(page.extract_text() or "" for page in pages)
+    try:
+        pages = reader.pages[:max_pages]
+        text = "\n\n".join(page.extract_text() or "" for page in pages)
+    except Exception as exc:  # noqa: BLE001 — malformed page trees, bad fonts, etc.
+        raise PdfExtractionError(f"Couldn't extract text from that PDF: {exc}") from exc
     text = text.strip()
 
     if len(text) < 40:
