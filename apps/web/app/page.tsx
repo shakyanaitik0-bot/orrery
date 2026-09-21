@@ -183,13 +183,15 @@ export default function Page() {
           <p className="hud-eyebrow">Orrery · {account.displayName}</p>
           <div className="subject-row">
             <button
-              className="btn"
+              className="icon-btn"
               onClick={() => {
                 setSubjectSlug(null);
                 setSelected(null);
               }}
+              aria-label="Back to dashboard"
+              title="Back to dashboard"
             >
-              ← Dashboard
+              ←
             </button>
             <select
               id="subject-picker"
