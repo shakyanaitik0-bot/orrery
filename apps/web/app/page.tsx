@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AuthGate from "@/components/AuthGate";
 import IngestPanel from "@/components/IngestPanel";
+import QuizPanel from "@/components/QuizPanel";
 import ReviewPanel from "@/components/ReviewPanel";
 import TutorPanel from "@/components/TutorPanel";
 import { fetchProvider, fetchScene, listSubjects, restoreAccount } from "@/lib/api";
@@ -30,6 +31,7 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [showIngest, setShowIngest] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [quizNode, setQuizNode] = useState<SceneNode | null>(null);
 
   // Restore a stored account on load, falling back to the auth gate.
   useEffect(() => {
@@ -202,6 +204,16 @@ export default function Page() {
           node={selected}
           nodesById={nodesById}
           onClose={() => setSelected(null)}
+          onMasteryChange={handleMasteryChange}
+          onQuiz={() => setQuizNode(selected)}
+        />
+      )}
+
+      {quizNode && (
+        <QuizPanel
+          conceptId={quizNode.id}
+          conceptTitle={quizNode.title}
+          onClose={() => setQuizNode(null)}
           onMasteryChange={handleMasteryChange}
         />
       )}

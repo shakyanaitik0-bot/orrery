@@ -160,6 +160,7 @@ body {
 }
 
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.panel-head-actions { display: flex; align-items: center; gap: 8px; }
 .panel-eyebrow {
   font-family: var(--mono);
   font-size: 10px;
@@ -366,7 +367,9 @@ body {
   display: grid;
   place-items: center;
   padding: 24px;
-  z-index: 10;
+  /* Above the canvas's own drei-rendered node labels, which sit at z-index 100
+     and otherwise float over any open modal. */
+  z-index: 200;
 }
 .modal {
   width: min(520px, 100%);
@@ -466,3 +469,65 @@ body {
 .dropzone:hover { border-color: var(--open); }
 .dropzone.has-file { border-style: solid; border-color: var(--mastered); color: var(--ink); }
 .dropzone span { font-size: 12px; color: var(--ink-3); }
+
+/* --- Quiz ------------------------------------------------------------ */
+
+.quiz-question {
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.quiz-prompt {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.quiz-options { display: flex; flex-direction: column; gap: 6px; }
+.quiz-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--panel-2);
+  font-size: 13.5px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.quiz-option:hover { border-color: var(--open); }
+.quiz-option.is-picked { border-color: var(--open); background: rgba(90, 169, 199, 0.1); }
+.quiz-option input { margin-top: 2px; accent-color: var(--open); flex: none; }
+
+.quiz-input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13.5px;
+}
+.quiz-input:focus { outline: none; border-color: var(--open); }
+
+.quiz-result {
+  border-left: 2px solid var(--rule);
+  padding: 10px 0 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.quiz-result.is-right { border-left-color: var(--mastered); }
+.quiz-result.is-wrong { border-left-color: var(--danger); }
+.quiz-given, .quiz-answer, .quiz-explanation {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.quiz-given { color: var(--ink-2); }
+.quiz-answer { color: var(--mastered); }
+.quiz-explanation { color: var(--ink-3); }

@@ -9,6 +9,20 @@ Keep this current — it is the record that makes the licence position auditable
 |---|---|---|---|
 | `packages/engine/` | [skillcoco/skillcoco](https://github.com/skillcoco/skillcoco) `skillcoco-core` | MIT | Licence retained at `packages/engine/LICENSE`. Contains Apache-2.0 DeepTutor-derived portions with file-level attribution — do not strip those headers. Only change made: workspace dependency declarations replaced with the versions the upstream lockfile pinned, so the crate builds standalone. All 126 upstream tests pass unmodified. |
 
+## Approaches ported from two more MIT sources (AI-Tutor, TutorBot)
+
+Two further MIT-licensed source projects were not used in the initial merge.
+Their licences (© Hariom Kumar; © TutorBot Team) permit copying; what
+follows is either logic reimplemented in Python from their approach, or a
+UI/data shape carried over — no source file was copied verbatim.
+
+| What | Source project | Where it lives now |
+|---|---|---|
+| Quiz mode: mixed MCQ/short-answer generation, server-side grading, wired into the same BKT mastery update flashcards and the tutor use | TutorBot (`backend/utils/ai.ts`, `components/QuizComponent.tsx`) | `services/learning/quiz.py`, `routers/quiz.py`, `components/QuizPanel.tsx` |
+| Defensive JSON-response parsing for LLM output | TutorBot (`backend/utils/ai.ts` `cleanAIResponse`) | `services/learning/quiz.py` `_extract_json` (same pattern already existed in `services/learning/ingest.py`, kept consistent) |
+| Anki-importable CSV deck export | TutorBot (`hooks/flashcardExport.hook.ts`) | `services/learning/export.py`, `GET /api/review/export/{subject}.csv` — streamed to the response rather than written to a web-served directory, which was a real flaw in the original |
+| Ollama (local model) provider: model discovery quirks across `ollama` client response shapes | AI-Tutor (`app.py`) | `services/llm/ollama.py` |
+
 Nothing else is copied.
 
 ## Ideas reimplemented, code written fresh

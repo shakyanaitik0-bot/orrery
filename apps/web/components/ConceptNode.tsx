@@ -107,6 +107,9 @@ export default function ConceptNode({
           distanceFactor={22}
           position={[0, radius + 1.1, 0]}
           style={{ pointerEvents: "none" }}
+          // drei defaults this to ~16.7 million, which floats the label over
+          // any open modal. Keep labels below the modal layer instead.
+          zIndexRange={[100, 0]}
         >
           <div className="node-label">
             <strong>{node.title}</strong>

@@ -15,11 +15,13 @@ export default function TutorPanel({
   nodesById,
   onClose,
   onMasteryChange,
+  onQuiz,
 }: {
   node: SceneNode;
   nodesById: Map<string, SceneNode>;
   onClose: () => void;
   onMasteryChange: (conceptId: string, mastery: number) => void;
+  onQuiz: () => void;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
@@ -124,6 +126,15 @@ export default function TutorPanel({
           </button>
           <button onClick={() => grade(false)} className="btn btn-no">
             Got it wrong
+          </button>
+        </div>
+      </div>
+
+      <div className="grade-row">
+        <span>Check yourself</span>
+        <div>
+          <button onClick={onQuiz} className="btn btn-review">
+            Quiz me
           </button>
         </div>
       </div>

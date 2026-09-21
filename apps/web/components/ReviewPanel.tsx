@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { fetchDueCards, gradeCard } from "@/lib/api";
+import { exportDeckCsv, fetchDueCards, gradeCard } from "@/lib/api";
 import type { ReviewCard } from "@/lib/api";
 
 // SM-2's own four-way recall scale, mapped to plain language. "Again" is the
@@ -63,9 +63,21 @@ export default function ReviewPanel({
             <p className="panel-eyebrow">Review · {subjectSlug}</p>
             <h2>Flashcards</h2>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            ×
-          </button>
+          <div className="panel-head-actions">
+            <button
+              className="btn btn-review"
+              onClick={() =>
+                exportDeckCsv(subjectSlug).catch((e) =>
+                  setError(e instanceof Error ? e.message : "Could not export the deck.")
+                )
+              }
+            >
+              Export to Anki
+            </button>
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              ×
+            </button>
+          </div>
         </header>
 
         {error && <p className="chat-error">{error}</p>}

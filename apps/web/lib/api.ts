@@ -170,6 +170,21 @@ export interface GradeResult {
   mastery: number;
 }
 
+/** Downloads the learner's deck for a subject as an Anki-importable CSV. */
+export async function exportDeckCsv(subjectSlug: string): Promise<void> {
+  const res = await fetch(`/api/review/export/${subjectSlug}.csv`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Could not export the deck (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${subjectSlug}-deck.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function gradeCard(cardId: string, quality: number): Promise<GradeResult> {
   const res = await fetch("/api/review/grade", {
     method: "POST",
@@ -177,6 +192,60 @@ export async function gradeCard(cardId: string, quality: number): Promise<GradeR
     body: JSON.stringify({ card_id: cardId, quality }),
   });
   if (!res.ok) throw new Error(`Could not record that review (${res.status})`);
+  return res.json();
+}
+
+export interface QuizQuestion {
+  id: string;
+  type: "mcq" | "short";
+  prompt: string;
+  options: string[] | null;
+}
+
+export interface GeneratedQuiz {
+  quizId: string;
+  conceptTitle: string;
+  questions: QuizQuestion[];
+}
+
+export interface QuizResult {
+  score: number;
+  correct: number;
+  total: number;
+  mastery: number | null;
+  results: {
+    id: string;
+    prompt: string;
+    given: string;
+    correct: boolean;
+    answer: string;
+    explanation: string;
+  }[];
+}
+
+export async function generateQuiz(conceptId: string): Promise<GeneratedQuiz> {
+  const res = await fetch("/api/quiz/generate", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ concept_id: conceptId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Could not build a quiz (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function submitQuiz(
+  quizId: string,
+  answers: Record<string, string>
+): Promise<QuizResult> {
+  const res = await fetch("/api/quiz/submit", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ quiz_id: quizId, answers }),
+  });
+  if (!res.ok) throw new Error(`Could not mark that quiz (${res.status})`);
   return res.json();
 }
 

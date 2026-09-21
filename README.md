@@ -41,7 +41,13 @@ learner's real mastery drives what you see:
   clear error otherwise, no OCR or audio transcription attempted.
 - **Reviewing flashcards** ("Review") runs a per-concept SM-2 deck, generated
   automatically the first time you open a subject. Grading a card feeds the
-  same BKT mastery update as the tutor, so the map and the deck agree.
+  same BKT mastery update as the tutor, so the map and the deck agree. An
+  "Export to Anki" button in that panel downloads the deck as a CSV that
+  Anki's importer accepts directly.
+- **"Quiz me"** on any concept generates a short mixed multiple-choice /
+  short-answer quiz, grades it server-side (answers never reach the browser
+  before submission), and feeds every question into the same mastery engine
+  as a flashcard grade or a tutor "got it right."
 - **Three built-in subjects** — Algebra, Cell Biology, and Programming
   Fundamentals — each with real prerequisite structure, plus whatever you
   ingest yourself.
@@ -80,13 +86,13 @@ Without any provider credentials the tutor runs on an offline stub that says
 so in its own output — the map, the graph and all mastery scoring are fully
 live either way.
 
-## Connecting a real model: Bedrock or Gemini
+## Connecting a real model: Bedrock, Gemini, or Ollama
 
-Two real providers are supported, both behind the same `LLMClient`
-interface (`apps/api/services/llm/base.py`) — the app never talks to either
+Three real providers are supported, all behind the same `LLMClient`
+interface (`apps/api/services/llm/base.py`) — the app never talks to any
 vendor's SDK directly outside its own provider file. `LLM_PROVIDER=auto`
-(the default) tries Bedrock, then Gemini, then falls back to the stub;
-set it to `bedrock`, `gemini`, or `stub` to force one.
+(the default) tries Bedrock, then Gemini, then Ollama, then falls back to
+the stub; set it to `bedrock`, `gemini`, `ollama`, or `stub` to force one.
 
 **AWS Bedrock** — the whole integration is `apps/api/services/llm/bedrock.py`:
 
@@ -112,6 +118,20 @@ GEMINI_API_KEY=your-key-here   # never commit this — set it as an env var only
 GEMINI_MODEL_ID=gemini-2.5-flash              # optional, this is the default
 GEMINI_SMALL_MODEL_ID=gemini-2.5-flash-lite   # optional, this is the default
 ```
+
+**Ollama** — a fully offline, no-account option in
+`apps/api/services/llm/ollama.py`. Install [Ollama](https://ollama.com), pull
+a model, and there's nothing to set unless you want a non-default one:
+
+```bash
+ollama pull llama3               # any model works; llama3 is the default
+LLM_PROVIDER=ollama              # or leave as "auto" and it's tried last
+OLLAMA_MODEL_ID=llama3           # optional, this is the default
+OLLAMA_BASE_URL=http://localhost:11434   # optional, this is the default
+```
+
+No API key, no AWS account, no per-token cost — the tradeoff is running the
+model on your own machine, and answer quality depends on what you've pulled.
 
 Either way: `GET /api/tutor/provider` reports which provider is actually
 serving requests, and `LLM_REQUIRED=true` fails loudly instead of falling

@@ -3,6 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_session
 from models import ReviewCard, Subject, User
 from security import get_current_user
-from services.learning import flashcards
+from services.learning import export, flashcards
 
 router = APIRouter(prefix="/api/review", tags=["review"])
 
@@ -53,3 +54,28 @@ async def grade(
     if card is None or card.user_id != user.id:
         raise HTTPException(404, "No such card for this learner")
     return await flashcards.grade_card(session, card, body.quality)
+
+
+@router.get("/export/{subject_slug}.csv")
+async def export_csv(
+    subject_slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """The learner's own deck for this subject, as an Anki-importable CSV."""
+    subject = (
+        await session.execute(select(Subject).where(Subject.slug == subject_slug))
+    ).scalar_one_or_none()
+    if subject is None:
+        raise HTTPException(404, f"No subject '{subject_slug}'")
+
+    await flashcards.ensure_cards(session, user.id, subject.id)
+    cards = await flashcards.all_cards(session, user.id, subject.id)
+    csv_text = export.to_anki_csv(cards, subject.title)
+    return StreamingResponse(
+        iter([csv_text]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{subject_slug}-deck.csv"'
+        },
+    )

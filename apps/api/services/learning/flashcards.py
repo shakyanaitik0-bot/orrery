@@ -97,6 +97,22 @@ async def due_cards(session: AsyncSession, user_id, subject_id) -> list[dict]:
     ]
 
 
+async def all_cards(session: AsyncSession, user_id, subject_id) -> list[dict]:
+    """Every card in a subject's deck, due or not — for export, not review."""
+    rows = (
+        await session.execute(
+            select(ReviewCard, Concept.title)
+            .join(Concept, Concept.id == ReviewCard.concept_id)
+            .where(ReviewCard.user_id == user_id, Concept.subject_id == subject_id)
+            .order_by(Concept.title)
+        )
+    ).all()
+    return [
+        {"conceptTitle": title, "front": card.front, "back": card.back}
+        for card, title in rows
+    ]
+
+
 async def grade_card(session: AsyncSession, card: ReviewCard, quality: int) -> dict:
     """Reschedule via SM-2 and fold the same result into BKT mastery."""
     card = await _sm2_grade(session, card, quality)

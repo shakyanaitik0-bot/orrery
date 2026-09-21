@@ -1,11 +1,16 @@
 """Provider selection.
 
-`LLM_PROVIDER=auto` (the default) tries Bedrock, then Gemini, then falls
-back to the offline stub — whichever is reachable. Set it to "bedrock",
-"gemini", or "stub" to force one explicitly. Unless `LLM_REQUIRED` is set,
-in which case a missing provider is an error rather than a silent
-downgrade — a production deployment should fail loudly rather than quietly
-serve stub text to a student.
+`LLM_PROVIDER=auto` (the default) tries Bedrock, then Gemini, then Ollama,
+then falls back to the offline stub — whichever is reachable. Set it to
+"bedrock", "gemini", "ollama", or "stub" to force one explicitly. Unless
+`LLM_REQUIRED` is set, in which case a missing provider is an error rather
+than a silent downgrade — a production deployment should fail loudly rather
+than quietly serve stub text to a student.
+
+Ollama is tried last in "auto" because it depends on something running on
+the same machine as the API, which is the common case for local development
+but not for a real deployment — Bedrock and Gemini are both remote services
+reachable from anywhere, so they get first refusal.
 """
 
 import logging
@@ -45,7 +50,20 @@ async def _try_gemini() -> LLMClient | None:
     return None
 
 
-_PROVIDERS = {"bedrock": _try_bedrock, "gemini": _try_gemini}
+async def _try_ollama() -> LLMClient | None:
+    try:
+        from services.llm.ollama import OllamaClient
+
+        candidate = OllamaClient()
+        if await candidate.healthcheck():
+            logger.info("using ollama model %s", candidate.model_id)
+            return candidate
+    except Exception as exc:  # noqa: BLE001 - any failure means "not usable"
+        logger.warning("ollama unavailable: %s", exc)
+    return None
+
+
+_PROVIDERS = {"bedrock": _try_bedrock, "gemini": _try_gemini, "ollama": _try_ollama}
 
 
 async def get_client() -> LLMClient:
@@ -69,14 +87,14 @@ async def get_client() -> LLMClient:
                 f"LLM_REQUIRED is set but the configured provider '{provider}' is not usable"
             )
     elif provider == "auto":
-        for try_provider in (_try_bedrock, _try_gemini):
+        for try_provider in (_try_bedrock, _try_gemini, _try_ollama):
             candidate = await try_provider()
             if candidate is not None:
                 _client = candidate
                 return _client
         if settings.llm_required:
             raise LLMConfigurationError(
-                "LLM_REQUIRED is set but no provider (Bedrock, Gemini) is usable"
+                "LLM_REQUIRED is set but no provider (Bedrock, Gemini, Ollama) is usable"
             )
     else:
         raise LLMConfigurationError(f"Unknown LLM_PROVIDER '{provider}'")

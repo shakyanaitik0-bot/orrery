@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import Base, engine
-from routers import auth, graph, ingest, review, tutor
+from routers import auth, graph, ingest, quiz, review, tutor
 from services.llm.registry import get_client
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -29,6 +29,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(graph.router)
 app.include_router(ingest.router)
+app.include_router(quiz.router)
 app.include_router(review.router)
 app.include_router(tutor.router)
 

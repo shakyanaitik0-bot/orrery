@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     gemini_model_id: str = "gemini-2.5-flash"
     gemini_small_model_id: str = "gemini-2.5-flash-lite"
 
+    # --- Ollama (local models, no account, no API key) ---
+    # Set OLLAMA_MODEL_ID to whatever you've pulled, e.g. `ollama pull llama3`.
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model_id: str = "llama3"
+    ollama_small_model_id: str | None = None
+
     # Falls back to a deterministic stub when no provider is reachable, so
     # the app is demoable without any credentials. Set true in production.
     llm_required: bool = False

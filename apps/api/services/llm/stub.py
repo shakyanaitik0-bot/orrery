@@ -27,9 +27,10 @@ class StubClient(LLMClient):
         return (
             f"[offline stub — no LLM provider configured]\n\n"
             f"A tutor response to “{user_message.strip()[:120]}” would appear here. "
-            f"Set AWS credentials for Bedrock, or GEMINI_API_KEY for the free "
-            f"Gemini option, to route this through a real model; the request "
-            f"path is otherwise identical."
+            f"Set AWS credentials for Bedrock, GEMINI_API_KEY for the free "
+            f"Gemini option, or run Ollama locally with no account at all, "
+            f"to route this through a real model; the request path is "
+            f"otherwise identical."
         )
 
     def _fake_concept_graph(self, text: str) -> str:
@@ -64,11 +65,36 @@ class StubClient(LLMClient):
         self._last_usage = usage
         return self._compose(user_message), usage
 
+    def _fake_quiz(self, material: str) -> str:
+        subject = material.split("\n", 1)[0].removeprefix("Concept:").strip() or "this concept"
+        return json.dumps(
+            {
+                "questions": [
+                    {
+                        "type": "mcq",
+                        "prompt": f"[offline stub] Which of these names the concept you are studying?",
+                        "options": [subject, "An unrelated idea", "None of these"],
+                        "answer": subject,
+                        "explanation": "A real model would ask something worth answering here.",
+                    },
+                    {
+                        "type": "short",
+                        "prompt": f"[offline stub] Name the concept you are studying.",
+                        "answer": subject,
+                        "accept": [],
+                        "explanation": "Configure a provider to get real questions.",
+                    },
+                ]
+            }
+        )
+
     async def extract(self, system_prompt: str, user_message: str) -> tuple[str, dict]:
         usage = {"provider": "stub", "model": "stub", "input_tokens": 0, "output_tokens": 0}
         self._last_usage = usage
         if "concepts" in system_prompt and "edges" in system_prompt:
             return self._fake_concept_graph(user_message), usage
+        if "quizzes" in system_prompt and "questions" in system_prompt:
+            return self._fake_quiz(user_message), usage
         return self._compose(user_message), usage
 
     async def stream_chat(self, system_prompt: str, user_message: str) -> AsyncIterator[str]:

@@ -211,6 +211,35 @@ class ReviewCard(Base):
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class Quiz(Base):
+    """A generated quiz for one learner on one concept.
+
+    The correct answers live here and are never sent to the browser — the
+    client receives questions only, and grading happens server-side when the
+    attempt comes back. Otherwise a learner could read the answers out of the
+    network tab and the mastery score it feeds would mean nothing.
+    """
+
+    __tablename__ = "quizzes"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    concept_id: Mapped[uuid.UUID] = mapped_column(
+        GUID, ForeignKey("concepts.id", ondelete="CASCADE"), index=True
+    )
+    # [{id, type: "mcq"|"short", prompt, options?, answer, explanation}]
+    questions: Mapped[dict] = mapped_column(JSONDict)
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class ChatTurn(Base):
     """Tutor conversation, scoped to a concept so it can be replayed in context."""
 
