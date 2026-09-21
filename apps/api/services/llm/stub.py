@@ -1,8 +1,9 @@
-"""Offline stand-in used when Bedrock has no credentials.
+"""Offline stand-in used when no real provider is configured.
 
-Keeps the app demoable on a laptop with no AWS account. It is selected only
-when `LLM_REQUIRED` is false, and it says plainly in its own output that it is
-not a real model, so a stub response can never be mistaken for tutoring.
+Keeps the app demoable with no AWS account and no Gemini key. It is
+selected only when `LLM_REQUIRED` is false, and it says plainly in its own
+output that it is not a real model, so a stub response can never be
+mistaken for tutoring.
 
 `extract` gets a second mode: when the caller is clearly asking for the
 ingestion pipeline's concept-graph JSON (see `services/learning/ingest.py`),
@@ -24,10 +25,11 @@ class StubClient(LLMClient):
 
     def _compose(self, user_message: str) -> str:
         return (
-            f"[offline stub — no Bedrock credentials configured]\n\n"
+            f"[offline stub — no LLM provider configured]\n\n"
             f"A tutor response to “{user_message.strip()[:120]}” would appear here. "
-            f"Set AWS credentials and BEDROCK_MODEL_ID to route this through "
-            f"Bedrock; the request path is otherwise identical."
+            f"Set AWS credentials for Bedrock, or GEMINI_API_KEY for the free "
+            f"Gemini option, to route this through a real model; the request "
+            f"path is otherwise identical."
         )
 
     def _fake_concept_graph(self, text: str) -> str:

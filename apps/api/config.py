@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     # upstream project, neither dialect is rejected at startup.
     database_url: str = "sqlite+aiosqlite:///./orrery.db"
 
+    # Which provider to use: "auto" (Bedrock, then Gemini, then the offline
+    # stub — whichever is reachable), or force one of "bedrock" / "gemini" /
+    # "stub" explicitly.
+    llm_provider: str = "auto"
+
     # --- AWS Bedrock ---
     bedrock_region: str = "us-east-1"
     bedrock_model_id: str = "us.anthropic.claude-sonnet-5-20260115-v1:0"
@@ -29,8 +34,15 @@ class Settings(BaseSettings):
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
 
-    # Falls back to a deterministic stub when Bedrock is unreachable, so the
-    # app is demoable without AWS credentials. Set true in production.
+    # --- Google Gemini (a free-tier alternative to Bedrock) ---
+    # Get a key at https://aistudio.google.com/apikey — set as an
+    # environment variable, never committed.
+    gemini_api_key: str | None = None
+    gemini_model_id: str = "gemini-2.5-flash"
+    gemini_small_model_id: str = "gemini-2.5-flash-lite"
+
+    # Falls back to a deterministic stub when no provider is reachable, so
+    # the app is demoable without any credentials. Set true in production.
     llm_required: bool = False
 
     @property

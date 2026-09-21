@@ -76,27 +76,53 @@ account. `seed.py` seeds a separate "Demo Learner" account with pre-filled
 progress, for reference; there's no login-as-that-user flow, since the app
 has no password-based login yet (see "Real identity" below).
 
-Without AWS credentials the tutor runs on an offline stub that says so in its
-own output — the map, the graph and all mastery scoring are fully live either
-way.
+Without any provider credentials the tutor runs on an offline stub that says
+so in its own output — the map, the graph and all mastery scoring are fully
+live either way.
 
-## Connecting AWS Bedrock
+## Connecting a real model: Bedrock or Gemini
 
-The entire integration is `apps/api/services/llm/bedrock.py`. Set:
+Two real providers are supported, both behind the same `LLMClient`
+interface (`apps/api/services/llm/base.py`) — the app never talks to either
+vendor's SDK directly outside its own provider file. `LLM_PROVIDER=auto`
+(the default) tries Bedrock, then Gemini, then falls back to the stub;
+set it to `bedrock`, `gemini`, or `stub` to force one.
+
+**AWS Bedrock** — the whole integration is `apps/api/services/llm/bedrock.py`:
 
 ```bash
 BEDROCK_REGION=us-east-1
 BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-5-20260115-v1:0
 BEDROCK_SMALL_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0
-LLM_REQUIRED=true      # fail loudly instead of falling back to the stub
 ```
 
 Credentials resolve through the normal boto3 chain, so in deployment the task
-or instance role is enough and no keys go in the environment.
+or instance role is enough and no keys go in the environment. It uses the
+Bedrock **Converse** API rather than per-model `invoke_model` payloads, so
+switching to Llama or Mistral on Bedrock is a model-id change.
 
-It uses the Bedrock **Converse** API rather than per-model `invoke_model`
-payloads, so switching to Llama or Mistral on Bedrock is a model-id change.
-`GET /api/tutor/provider` reports which provider is actually serving requests.
+**Google Gemini** — a free-tier alternative with no AWS account needed, in
+`apps/api/services/llm/gemini.py`. Get a free key at
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey) (no billing
+account required for the free tier's rate limits) and set:
+
+```bash
+LLM_PROVIDER=gemini            # or leave as "auto" and just set the key below
+GEMINI_API_KEY=your-key-here   # never commit this — set it as an env var only
+GEMINI_MODEL_ID=gemini-2.5-flash              # optional, this is the default
+GEMINI_SMALL_MODEL_ID=gemini-2.5-flash-lite   # optional, this is the default
+```
+
+Either way: `GET /api/tutor/provider` reports which provider is actually
+serving requests, and `LLM_REQUIRED=true` fails loudly instead of falling
+back to the stub if the configured provider turns out not to be reachable —
+useful in production, where silently serving stub text would be worse than
+an error.
+
+**Never put a real API key or AWS secret in the repository or in chat.**
+Both settings above are read from environment variables (a local `.env` file
+is fine — it's already listed in `.gitignore`), never from a config file
+that gets committed.
 
 ## Postgres
 
