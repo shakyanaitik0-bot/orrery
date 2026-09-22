@@ -8,6 +8,7 @@ import Dashboard from "@/components/Dashboard";
 import IngestPanel from "@/components/IngestPanel";
 import QuizPanel from "@/components/QuizPanel";
 import ReviewPanel from "@/components/ReviewPanel";
+import SyllabusList from "@/components/SyllabusList";
 import TutorPanel from "@/components/TutorPanel";
 import { clearStoredAccount, fetchProvider, fetchScene, listSubjects, restoreAccount } from "@/lib/api";
 import type { Account } from "@/lib/api";
@@ -32,6 +33,9 @@ export default function Page() {
   const [showIngest, setShowIngest] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [quizNode, setQuizNode] = useState<SceneNode | null>(null);
+  // The 3D map is the default reading of a subject; the list is the same
+  // graph flattened into an ordered outline for people who'd rather scan it.
+  const [view, setView] = useState<"map" | "list">("map");
 
   // Restore a stored account on load, falling back to the auth gate.
   useEffect(() => {
@@ -176,7 +180,11 @@ export default function Page() {
 
   return (
     <main className="stage">
-      <KnowledgeMap scene={scene} selectedId={selected?.id ?? null} onSelect={setSelected} />
+      {view === "map" ? (
+        <KnowledgeMap scene={scene} selectedId={selected?.id ?? null} onSelect={setSelected} />
+      ) : (
+        <SyllabusList scene={scene} onSelect={setSelected} />
+      )}
 
       <header className="hud hud-top">
         <div>
@@ -211,6 +219,20 @@ export default function Page() {
                 </option>
               ))}
             </select>
+            <div className="view-toggle" role="group" aria-label="View">
+              <button
+                className={`view-tab ${view === "map" ? "is-active" : ""}`}
+                onClick={() => setView("map")}
+              >
+                Map
+              </button>
+              <button
+                className={`view-tab ${view === "list" ? "is-active" : ""}`}
+                onClick={() => setView("list")}
+              >
+                List
+              </button>
+            </div>
             <button className="btn btn-add" onClick={() => setShowIngest(true)}>
               + New subject
             </button>
@@ -246,7 +268,9 @@ export default function Page() {
           <li><i className="dot d-locked" />Locked</li>
         </ul>
         <p className="hud-note">
-          Height is prerequisite depth · size and glow are mastery · tutor on{" "}
+          {view === "map"
+            ? "Height is prerequisite depth · size and glow are mastery · tutor on "
+            : "Stages follow prerequisite order · tutor on "}
           <strong>{provider}</strong>
         </p>
       </footer>
