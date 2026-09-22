@@ -174,7 +174,7 @@ export async function fetchDashboard(): Promise<{
 export async function listSubjects(): Promise<
   { id: string; slug: string; title: string; description: string | null; accent: string }[]
 > {
-  const res = await fetch("/api/graph/subjects", { cache: "no-store" });
+  const res = await fetch("/api/graph/subjects", { cache: "no-store", headers: authHeaders() });
   if (!res.ok) return [];
   return res.json();
 }

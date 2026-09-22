@@ -9,7 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
-from models import Concept, ConceptEdge, EdgeType, Subject
+from models import Concept, ConceptEdge, EdgeType, Subject, User
+from security import get_current_user
 from services.learning.ingest import IngestError, extract_concept_graph
 from services.learning.pdf import PdfExtractionError, extract_text
 from services.learning.youtube import YoutubeExtractionError, fetch_transcript
@@ -36,7 +37,9 @@ def _slugify(title: str) -> str:
     return s or f"subject-{uuid.uuid4().hex[:8]}"
 
 
-async def _build_subject(session: AsyncSession, text: str, title: str | None) -> dict:
+async def _build_subject(
+    session: AsyncSession, text: str, title: str | None, creator: User
+) -> dict:
     """Shared by the text and PDF entry points: text in, a persisted subject out."""
     client = await get_client()
     try:
@@ -51,7 +54,9 @@ async def _build_subject(session: AsyncSession, text: str, title: str | None) ->
     if existing is not None:
         slug = f"{slug}-{uuid.uuid4().hex[:6]}"
 
-    subject = Subject(slug=slug, title=subject_title)
+    # Tag with the creator's own level so it shows up on their dashboard —
+    # the content and tutor complexity were generated for that level.
+    subject = Subject(slug=slug, title=subject_title, education_levels=[creator.education_level])
     session.add(subject)
     await session.flush()
 
@@ -87,19 +92,24 @@ async def _build_subject(session: AsyncSession, text: str, title: str | None) ->
 
 
 @router.post("/notes")
-async def ingest_notes(body: NotesIn, session: AsyncSession = Depends(get_session)):
+async def ingest_notes(
+    body: NotesIn,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """Paste notes, a transcript, or pasted document text; get back a subject.
 
     Covers the "paste notes" path from the source projects' ingestion flows.
     A PDF becomes text upstream of this same builder — see `/pdf` below.
     """
-    return await _build_subject(session, body.text, body.title)
+    return await _build_subject(session, body.text, body.title, user)
 
 
 @router.post("/pdf")
 async def ingest_pdf(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """Upload a PDF; get back a subject built from its text.
 
@@ -117,11 +127,15 @@ async def ingest_pdf(
         raise HTTPException(422, str(exc)) from exc
 
     # Let the model choose the title from the content; no forced override.
-    return await _build_subject(session, text, title=None)
+    return await _build_subject(session, text, title=None, creator=user)
 
 
 @router.post("/youtube")
-async def ingest_youtube(body: YoutubeIn, session: AsyncSession = Depends(get_session)):
+async def ingest_youtube(
+    body: YoutubeIn,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """Paste a YouTube link; get back a subject built from its transcript.
 
     Reads whatever caption track the video already has — no video download,
@@ -133,4 +147,4 @@ async def ingest_youtube(body: YoutubeIn, session: AsyncSession = Depends(get_se
     except YoutubeExtractionError as exc:
         raise HTTPException(422, str(exc)) from exc
 
-    return await _build_subject(session, text, body.title)
+    return await _build_subject(session, text, body.title, user)

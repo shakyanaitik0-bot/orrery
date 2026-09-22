@@ -138,6 +138,11 @@ class Subject(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Hex accent used to colour this subject's region of the 3D map.
     accent: Mapped[str] = mapped_column(String(7), default="#0b6f7d")
+    # Which User.education_level values this subject is written for; null
+    # means "everyone" (the fallback for subjects created before this field
+    # existed). A subject built via "+ New subject" is tagged with its
+    # creator's own level, since its content and tutor complexity match that.
+    education_levels: Mapped[list[str] | None] = mapped_column(JSONDict, nullable=True)
 
 
 class Concept(Base):

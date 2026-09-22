@@ -22,13 +22,26 @@ class AnswerIn(BaseModel):
     correct: bool
 
 
+def _visible_to(subjects: list[Subject], user: User) -> list[Subject]:
+    """A subject with no `education_levels` is visible to everyone (seed data
+    predating this field, or a fallback); otherwise it must list the
+    learner's own level."""
+    return [
+        s for s in subjects
+        if not s.education_levels or user.education_level in s.education_levels
+    ]
+
+
 @router.get("/subjects")
-async def list_subjects(session: AsyncSession = Depends(get_session)):
+async def list_subjects(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     rows = (await session.execute(select(Subject).order_by(Subject.title))).scalars().all()
     return [
         {"id": str(s.id), "slug": s.slug, "title": s.title,
          "description": s.description, "accent": s.accent}
-        for s in rows
+        for s in _visible_to(rows, user)
     ]
 
 
@@ -44,6 +57,7 @@ async def dashboard(
     map itself would show for the same subject.
     """
     subjects = (await session.execute(select(Subject).order_by(Subject.title))).scalars().all()
+    subjects = _visible_to(subjects, user)
     all_edges = (await session.execute(select(ConceptEdge))).scalars().all()
     mastery_rows = (
         await session.execute(select(Mastery).where(Mastery.user_id == user.id))

@@ -22,6 +22,7 @@ SUBJECTS = [
             "title": "Algebra",
             "description": "From arithmetic laws through to quadratic behaviour.",
             "accent": "#0b6f7d",
+            "education_levels": ["primary", "secondary", "high_school"],
         },
         "concepts": [
             ("number-line", "The Number Line", "Ordering, magnitude and sign as position."),
@@ -72,6 +73,7 @@ SUBJECTS = [
             "title": "Cell Biology",
             "description": "From cell theory to how a cell grows and divides.",
             "accent": "#2f7a3d",
+            "education_levels": ["secondary", "high_school", "undergraduate"],
         },
         "concepts": [
             ("cell-theory", "Cell Theory", "All living things are made of cells, the basic unit of life."),
@@ -113,6 +115,7 @@ SUBJECTS = [
             "title": "Programming Fundamentals",
             "description": "From variables to why an algorithm's cost matters.",
             "accent": "#6f4fb0",
+            "education_levels": ["high_school", "undergraduate", "postgraduate"],
         },
         "concepts": [
             ("variables", "Variables", "Named storage for a value that can change."),
