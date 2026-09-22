@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AuthGate from "@/components/AuthGate";
 import Dashboard from "@/components/Dashboard";
+import FlowchartView from "@/components/FlowchartView";
 import IngestPanel from "@/components/IngestPanel";
+import OrbitLoader from "@/components/OrbitLoader";
 import QuizPanel from "@/components/QuizPanel";
 import ReviewPanel from "@/components/ReviewPanel";
 import SyllabusList from "@/components/SyllabusList";
@@ -17,7 +19,12 @@ import type { Scene, SceneNode } from "@/lib/types";
 // The canvas touches `window` on import, so it must not render on the server.
 const KnowledgeMap = dynamic(() => import("@/components/KnowledgeMap"), {
   ssr: false,
-  loading: () => <div className="boot">Loading the map…</div>,
+  loading: () => (
+    <div className="boot">
+      <OrbitLoader />
+      <p>Loading the map…</p>
+    </div>
+  ),
 });
 
 export default function Page() {
@@ -33,9 +40,9 @@ export default function Page() {
   const [showIngest, setShowIngest] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [quizNode, setQuizNode] = useState<SceneNode | null>(null);
-  // The 3D map is the default reading of a subject; the list is the same
-  // graph flattened into an ordered outline for people who'd rather scan it.
-  const [view, setView] = useState<"map" | "list">("map");
+  // The 3D map is the default reading of a subject; list and flowchart are
+  // the same graph read as a scannable outline or a 2D diagram.
+  const [view, setView] = useState<"map" | "list" | "flowchart">("map");
 
   // Restore a stored account on load, falling back to the auth gate.
   useEffect(() => {
@@ -132,7 +139,14 @@ export default function Page() {
     setSubjects([]);
   }, []);
 
-  if (account === undefined) return <div className="boot">Loading…</div>;
+  if (account === undefined) {
+    return (
+      <div className="boot">
+        <OrbitLoader />
+        <p>Loading…</p>
+      </div>
+    );
+  }
 
   if (account === null) {
     return <AuthGate onReady={(a) => setAccount(a)} />;
@@ -172,7 +186,14 @@ export default function Page() {
     );
   }
 
-  if (!scene) return <div className="boot">Loading the map…</div>;
+  if (!scene) {
+    return (
+      <div className="boot">
+        <OrbitLoader />
+        <p>Loading the map…</p>
+      </div>
+    );
+  }
 
   const mastered = scene.nodes.filter((n) => n.mastered).length;
   const open = scene.nodes.filter((n) => !n.locked && !n.mastered).length;
@@ -182,8 +203,10 @@ export default function Page() {
     <main className="stage">
       {view === "map" ? (
         <KnowledgeMap scene={scene} selectedId={selected?.id ?? null} onSelect={setSelected} />
-      ) : (
+      ) : view === "list" ? (
         <SyllabusList scene={scene} onSelect={setSelected} />
+      ) : (
+        <FlowchartView scene={scene} onSelect={setSelected} />
       )}
 
       <header className="hud hud-top">
@@ -232,6 +255,12 @@ export default function Page() {
               >
                 List
               </button>
+              <button
+                className={`view-tab ${view === "flowchart" ? "is-active" : ""}`}
+                onClick={() => setView("flowchart")}
+              >
+                Flowchart
+              </button>
             </div>
             <button className="btn btn-add" onClick={() => setShowIngest(true)}>
               + New subject
@@ -270,7 +299,9 @@ export default function Page() {
         <p className="hud-note">
           {view === "map"
             ? "Height is prerequisite depth · size and glow are mastery · tutor on "
-            : "Stages follow prerequisite order · tutor on "}
+            : view === "list"
+            ? "Stages follow prerequisite order · tutor on "
+            : "Arrows show what unlocks what · tutor on "}
           <strong>{provider}</strong>
         </p>
       </footer>

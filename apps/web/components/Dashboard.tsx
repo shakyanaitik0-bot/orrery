@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import OrbitLoader from "@/components/OrbitLoader";
 import { fetchDashboard } from "@/lib/api";
 import type { DashboardSubject } from "@/lib/api";
 
@@ -68,7 +69,12 @@ export default function Dashboard({
       </header>
 
       {error && <p className="chat-error">{error}</p>}
-      {!subjects && !error && <p className="chat-empty">Loading your progress…</p>}
+      {!subjects && !error && (
+        <div className="dashboard-loading">
+          <OrbitLoader size={32} />
+          <p className="chat-empty">Loading your progress…</p>
+        </div>
+      )}
 
       {subjects && subjects.length === 0 && (
         <p className="chat-empty">No subjects yet — add one to get started.</p>
