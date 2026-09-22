@@ -14,6 +14,7 @@ unchanged — deferred so this stays scoped to what was actually asked for.
 import json
 import re
 
+from services.learning.layout import acyclic_prereqs
 from services.llm.base import LLMClient
 
 SYSTEM_PROMPT = """You turn study material into a small knowledge graph.
@@ -37,7 +38,13 @@ Respond with ONLY a JSON object, no prose, no code fence, in this exact shape:
 Rules:
 - Every slug in "edges" must appear in "concepts".
 - Prefer more, smaller concepts over few broad ones.
-- Do not invent material that is not in the text."""
+- Do not invent material that is not in the text.
+- Prerequisites must run one way only. Never make two concepts require each
+  other, directly or through a chain, and never make a concept require itself.
+- At least one concept must have no prerequisites at all — that is where the
+  learner starts.
+- Keep the concepts in one connected body of material: every concept should
+  reach the rest through some chain of edges rather than floating alone."""
 
 
 class IngestError(ValueError):
@@ -81,6 +88,14 @@ async def extract_concept_graph(client: LLMClient, text: str) -> dict:
         e for e in edges
         if isinstance(e, dict) and e.get("source") in slugs and e.get("target") in slugs
     ]
+
+    # Models do sometimes return mutually-dependent concepts despite the
+    # prompt. Storing those would lock every concept in the cycle — and
+    # anything downstream of it — with no way for the learner to start, so the
+    # offending edges are dropped before the graph is persisted.
+    kept, _ = acyclic_prereqs([(e["source"], e["target"]) for e in clean_edges])
+    kept_set = set(kept)
+    clean_edges = [e for e in clean_edges if (e["source"], e["target"]) in kept_set]
 
     return {
         "subject_title": data.get("subject_title", "Untitled subject"),

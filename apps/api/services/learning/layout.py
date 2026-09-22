@@ -24,6 +24,38 @@ RING_RADIUS = 7.4
 LAYER_HEIGHT = 3.0
 
 
+def acyclic_prereqs(prereq_edges: list[tuple[str, str]]) -> tuple[list[tuple[str, str]], set]:
+    """Keep the largest prefix of these edges that stays a DAG.
+
+    A generated graph can claim A requires B *and* B requires A. Left alone
+    that locks every concept in the cycle forever — and, through them, whatever
+    sits downstream — so a subject can end up with no available concept at all
+    and no way in. Edges are considered in order and one is dropped only when
+    it would close a cycle, which leaves at least one concept with no unmet
+    prerequisite: a finite DAG always has a source.
+    """
+    requires: dict[str, set] = defaultdict(set)  # node -> all it needs first
+    kept: list[tuple[str, str]] = []
+    dropped: set = set()
+
+    for src, dst in prereq_edges:
+        # The edge says dst requires src. That closes a cycle exactly when src
+        # already requires dst.
+        if src == dst or dst in requires.get(src, ()):
+            dropped.add((src, dst))
+            continue
+        kept.append((src, dst))
+        # dst now requires src and everything src requires — and so does
+        # anything that already required dst.
+        gained = {src} | requires.get(src, set())
+        for needed in requires.values():
+            if dst in needed:
+                needed |= gained
+        requires[dst] |= gained
+
+    return kept, dropped
+
+
 def _depths(node_ids: list[str], prereq_edges: list[tuple[str, str]]) -> dict[str, int]:
     """Longest-path depth for each node over prerequisite edges.
 
@@ -64,10 +96,17 @@ def build_scene(
     source/target/relation; `mastery` maps concept id to probability.
     """
     ids = [c["id"] for c in concepts]
-    prereqs = [
+    prereqs, broken = acyclic_prereqs([
         (e["source"], e["target"])
         for e in edges
         if e["relation"] == EdgeType.prerequisite.value
+    ])
+    # A cycle-closing edge gates nothing, so it is not drawn either — a line
+    # the learner cannot act on reads as a bug.
+    edges = [
+        e for e in edges
+        if e["relation"] != EdgeType.prerequisite.value
+        or (e["source"], e["target"]) not in broken
     ]
     depth = _depths(ids, prereqs)
 
